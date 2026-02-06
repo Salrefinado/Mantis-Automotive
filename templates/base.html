@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MANTIS - Automotive Detailing</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <style>
+        /* Ajustes Globais Mantis */
+        body { background-color: #f8fafc; }
+        .mobile-nav-item { display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; }
+        
+        /* Estilo Dark Premium */
+        .bg-mantis-dark { background-color: #0a0a0a; }
+        .border-mantis { border-color: #1a1a1a; }
+        
+        /* === CORREÇÃO DO VISUAL DO SELECT2 === */
+        .select2-container { width: 100% !important; }
+        
+        .select2-container .select2-selection--single {
+            height: 42px !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 0.5rem !important;
+            display: flex !important;
+            align-items: center !important;
+            padding-left: 0.5rem;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 40px !important;
+            top: 1px !important;
+            right: 5px !important;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            color: #374151 !important;
+            line-height: normal !important;
+            padding-left: 0 !important;
+        }
+    </style>
+</head>
+<body class="pb-24 md:pb-0"> 
+    <nav class="bg-mantis-dark text-white shadow-2xl hidden md:block border-b border-zinc-800">
+        <div class="container mx-auto px-4 py-2 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <img src="{{ url_for('static', filename='mantis_logo.png') }}" alt="Mantis Logo" class="h-12 w-auto">
+                <div class="text-xl font-black tracking-tighter italic">MANTIS <span class="text-xs block not-italic font-light tracking-widest text-zinc-500 -mt-1 uppercase">Automotive Detailing</span></div>
+            </div>
+            <div class="space-x-6 font-medium text-sm uppercase tracking-widest">
+                <a href="{{ url_for('dashboard') }}" class="hover:text-blue-500 transition border-b-2 border-transparent hover:border-blue-500 py-2"><i class="fa-solid fa-calendar-days mr-1"></i> Agenda</a>
+                <a href="{{ url_for('listar_clientes') }}" class="hover:text-blue-500 transition border-b-2 border-transparent hover:border-blue-500 py-2"><i class="fa-solid fa-users mr-1"></i> Clientes</a>
+                <a href="{{ url_for('financeiro') }}" class="hover:text-blue-500 transition border-b-2 border-transparent hover:border-blue-500 py-2"><i class="fa-solid fa-chart-line mr-1"></i> Financeiro</a>
+                <a href="{{ url_for('gerenciar_produtos') }}" class="hover:text-blue-500 transition border-b-2 border-transparent hover:border-blue-500 py-2"><i class="fa-solid fa-boxes-stacked mr-1"></i> Stock</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 py-6">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="mb-6">
+                    {% for category, message in messages %}
+                        <div class="p-4 rounded-lg shadow-md mb-2 text-white {{ 'bg-green-600' if category == 'success' else 'bg-blue-500' if category == 'info' else 'bg-red-500' }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <nav class="fixed bottom-0 left-0 w-full bg-mantis-dark text-gray-400 border-t border-zinc-800 md:hidden z-50 safe-area-bottom">
+        <div class="flex justify-around items-center py-3">
+            <a href="{{ url_for('dashboard') }}" class="mobile-nav-item {{ 'text-blue-500 font-bold' if request.endpoint == 'dashboard' }}">
+                <i class="fa-solid fa-calendar-check text-xl mb-1"></i>
+                <span>Agenda</span>
+            </a>
+            <a href="{{ url_for('listar_clientes') }}" class="mobile-nav-item {{ 'text-blue-500 font-bold' if request.endpoint == 'listar_clientes' }}">
+                <i class="fa-solid fa-users text-xl mb-1"></i>
+                <span>Clientes</span>
+            </a>
+            
+            <div class="relative -mt-10">
+                <a href="#" onclick="if(window.abrirModalAgendamento) abrirModalAgendamento(); else window.location.href='{{ url_for('dashboard') }}'" class="flex items-center justify-center bg-blue-600 text-white rounded-full p-4 shadow-2xl border-4 border-mantis-dark transform active:scale-90 transition">
+                    <i class="fa-solid fa-plus text-2xl"></i>
+                </a>
+            </div>
+
+            <a href="{{ url_for('financeiro') }}" class="mobile-nav-item {{ 'text-blue-500 font-bold' if request.endpoint == 'financeiro' }}">
+                <i class="fa-solid fa-chart-pie text-xl mb-1"></i>
+                <span>Finan.</span>
+            </a>
+            <a href="{{ url_for('gerenciar_produtos') }}" class="mobile-nav-item {{ 'text-blue-500 font-bold' if request.endpoint == 'gerenciar_produtos' }}">
+                <i class="fa-solid fa-box-open text-xl mb-1"></i>
+                <span>Stock</span>
+            </a>
+        </div>
+    </nav>
+
+    <script>
+        $(document).ready(function() {
+            $('.select2-busca').select2({
+                width: '100%',
+                placeholder: "Pesquisar...",
+                allowClear: true,
+                language: {
+                    noResults: function() { return "Sem resultados"; },
+                    searching: function() { return "A pesquisar..."; }
+                }
+            });
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
