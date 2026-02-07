@@ -3,15 +3,14 @@ import locale
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
 from datetime import datetime
+from sqlalchemy import or_
 from database import db, Cliente, Moto, Agendamento, Produto, MidiaAgendamento, Servico
 
 app = Flask(__name__)
 
-# --- Configuração de Banco de Dados (Vercel/PostgreSQL vs Local/SQLite) ---
-# A Vercel fornece a conexão via variável de ambiente DATABASE_URL
+# --- Configuração de Banco de Dados ---
 database_url = os.environ.get('DATABASE_URL')
 
-# Ajuste necessário para compatibilidade com bibliotecas recentes (postgres:// -> postgresql://)
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
@@ -24,9 +23,7 @@ db.init_app(app)
 
 # Função para criar os serviços padrão se o banco estiver vazio
 def inicializar_servicos_padrao():
-    # Envolvemos em try/except para evitar erros em migrações ou conexões instáveis
     try:
-        # Verifica se a tabela existe e está vazia
         if Servico.query.first() is None:
             padroes = [
                 ('Naked', 'Standard Naked', 50.00), ('Naked', 'Premium Naked', 90.00),
@@ -46,7 +43,6 @@ with app.app_context():
     db.create_all()
     inicializar_servicos_padrao()
 
-# Tenta criar a pasta de uploads (pode falhar em sistemas de arquivo somente leitura como Vercel, mas não trava o app)
 try:
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 except OSError:
@@ -57,8 +53,11 @@ except OSError:
 def format_data_pt(value):
     if not value: return ""
     dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
-    dia_semana = dias[value.weekday()]
-    return f"{dia_semana}, {value.day:02d}/{value.month:02d}"
+    try:
+        dia_semana = dias[value.weekday()]
+        return f"{dia_semana}, {value.day:02d}/{value.month:02d}"
+    except:
+        return value
 
 # --- DASHBOARD ---
 @app.route('/')
@@ -70,7 +69,6 @@ def dashboard():
     produtos_alerta = Produto.query.filter(Produto.estoque_atual <= Produto.ponto_pedido).all()
     clientes_todos = Cliente.query.all()
     
-    # Busca preços do banco e formata para o Javascript do Dashboard
     servicos_db = Servico.query.all()
     tabela_precos = {}
     for s in servicos_db:
@@ -95,7 +93,6 @@ def financeiro():
     lucro_estimado = faturamento_total - custo_produtos_total
     ticket_medio = faturamento_total / len(concluidos) if concluidos else 0
     
-    # Busca a lista de serviços para edição
     servicos = Servico.query.order_by(Servico.categoria, Servico.valor).all()
     
     return render_template('financeiro.html', 
@@ -138,7 +135,18 @@ def novo_agendamento():
         tipo_servico = request.form.get('tipo_servico')
         valor = float(request.form.get('valor'))
         
+        # Indicação no Agendamento (opcional, se selecionado manualmente)
+        quem_indicou_id = request.form.get('quem_indicou_id')
+        
         cliente = Cliente.query.get(cliente_id)
+        
+        # Se informar indicação neste momento e o cliente ainda não tiver padrinho
+        if quem_indicou_id and not cliente.indicado_por_id:
+             cliente.indicado_por_id = quem_indicou_id
+             # Se acabou de ser indicado, ganha desconto agora? 
+             # Pela regra "Maria deve ganhar desde a primeira", sim.
+             cliente.saldo_desconto = True
+        
         aplicar_desconto = False
         if cliente.saldo_desconto:
             valor = valor * 0.90
@@ -180,17 +188,38 @@ def cancelar_agendamento(id):
         flash('Cancelado.', 'info')
     return redirect(url_for('dashboard'))
 
+@app.route('/excluir_agendamento/<int:id>')
+def excluir_agendamento(id):
+    try:
+        a = Agendamento.query.get(id)
+        if a:
+            db.session.delete(a)
+            db.session.commit()
+            flash('Agendamento excluído permanentemente.', 'success')
+        else:
+            flash('Agendamento não encontrado.', 'error')
+    except Exception as e:
+        flash(f'Erro ao excluir: {str(e)}', 'error')
+    return redirect(url_for('dashboard'))
+
 @app.route('/cadastrar_cliente', methods=['POST'])
 def cadastrar_cliente():
     try:
-        novo = Cliente(nome=request.form.get('nome'), telefone=request.form.get('telefone'), endereco=request.form.get('endereco'))
+        novo = Cliente(
+            nome=request.form.get('nome'), 
+            telefone=request.form.get('telefone'), 
+            endereco=request.form.get('endereco'),
+            preferencias=request.form.get('preferencias')
+        )
         quem = request.form.get('quem_indicou_id')
         if quem:
             novo.indicado_por_id = quem
-            padrinho = Cliente.query.get(quem)
-            if padrinho: padrinho.saldo_desconto = True
+            # Regra: Maria (indicada) ganha desconto na 1ª lavagem imediatamente
+            novo.saldo_desconto = True
+            
         db.session.add(novo)
         db.session.flush()
+        
         moto = Moto(cliente_id=novo.id, modelo=request.form.get('modelo_moto'), placa=request.form.get('placa_moto'), categoria=request.form.get('categoria_moto'))
         db.session.add(moto)
         db.session.commit()
@@ -206,11 +235,75 @@ def cadastrar_cliente():
         flash(f'Erro: {e}', 'error')
     return redirect(url_for('dashboard'))
 
+@app.route('/api/cadastrar_moto', methods=['POST'])
+def cadastrar_moto_api():
+    try:
+        cliente_id = request.form.get('cliente_id')
+        modelo = request.form.get('modelo')
+        placa = request.form.get('placa')
+        categoria = request.form.get('categoria')
+        
+        if not cliente_id or not modelo:
+            return jsonify({'success': False, 'error': 'Dados incompletos'}), 400
+            
+        nova_moto = Moto(cliente_id=cliente_id, modelo=modelo, placa=placa, categoria=categoria)
+        db.session.add(nova_moto)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'moto': nova_moto.to_dict()})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/editar_cliente', methods=['POST'])
+def editar_cliente():
+    try:
+        c_id = request.form.get('cliente_id')
+        cliente = Cliente.query.get(c_id)
+        if cliente:
+            cliente.nome = request.form.get('nome')
+            cliente.telefone = request.form.get('telefone')
+            cliente.endereco = request.form.get('endereco')
+            cliente.preferencias = request.form.get('preferencias')
+            db.session.commit()
+            flash('Dados do cliente atualizados.', 'success')
+        else:
+            flash('Cliente não encontrado.', 'error')
+    except Exception as e:
+        flash(f'Erro ao editar: {str(e)}', 'error')
+    return redirect(url_for('listar_clientes'))
+
+@app.route('/salvar_feedback', methods=['POST'])
+def salvar_feedback():
+    try:
+        agendamento_id = request.form.get('agendamento_id')
+        estrelas = request.form.get('estrelas')
+        texto = request.form.get('feedback_texto')
+        
+        agenda = Agendamento.query.get(agendamento_id)
+        if agenda:
+            agenda.feedback_estrelas = int(estrelas) if estrelas else None
+            agenda.feedback_texto = texto
+            db.session.commit()
+            flash('Feedback salvo com sucesso!', 'success')
+    except Exception as e:
+        flash(f'Erro ao salvar feedback: {str(e)}', 'error')
+    return redirect(url_for('listar_clientes'))
+
 @app.route('/api/buscar_cliente')
 def buscar_cliente():
     termo = request.args.get('q', '')
-    clientes = Cliente.query.filter(Cliente.nome.ilike(f'%{termo}%')).limit(10).all()
-    return jsonify([{'id':c.id, 'text':f"{c.nome} - {c.telefone}", 'motos':[m.to_dict() for m in c.motos], 'tem_desconto':c.saldo_desconto} for c in clientes])
+    # Filtra apenas se tiver pelo menos 1 caractere (feito no front, mas garantindo aqui)
+    if not termo:
+        return jsonify([])
+        
+    clientes = Cliente.query.filter(
+        or_(
+            Cliente.nome.ilike(f'%{termo}%'),
+            Cliente.telefone.ilike(f'%{termo}%')
+        )
+    ).limit(10).all()
+    
+    return jsonify([{'id':c.id, 'text':f"{c.nome} - {c.telefone}", 'motos':[m.to_dict() for m in c.motos], 'tem_desconto':c.saldo_desconto, 'preferencias': c.preferencias} for c in clientes])
 
 @app.route('/atualizar_status/<int:id>/<status>', methods=['POST'])
 def atualizar_status(id, status):
@@ -229,6 +322,8 @@ def atualizar_status(id, status):
     elif status == 'Lavagem Concluída':
         a.status = status
         a.tempo_fim = horario_dt
+        
+        # Consumo de Estoque
         if a.custo_total_produtos == 0:
             custo = 0
             for p in Produto.query.all():
@@ -236,6 +331,12 @@ def atualizar_status(id, status):
                     p.estoque_atual -= p.gasto_medio_lavagem
                     custo += p.custo_por_dose
             a.custo_total_produtos = custo
+        
+        # Regra de Desconto por Indicação (O Padrinho ganha agora)
+        if a.cliente.indicado_por_id:
+            padrinho = Cliente.query.get(a.cliente.indicado_por_id)
+            if padrinho:
+                padrinho.saldo_desconto = True
             
     db.session.commit()
     flash(f'Status atualizado para {status} às {horario_dt.strftime("%H:%M")}', 'info')
@@ -243,7 +344,6 @@ def atualizar_status(id, status):
 
 @app.route('/upload_midia/<int:agendamento_id>', methods=['POST'])
 def upload_midia(agendamento_id):
-    # Nota: Em Vercel, uploads locais são temporários e serão deletados após a execução.
     if 'arquivo' not in request.files: return 'Erro', 400
     arquivo = request.files['arquivo']
     if arquivo:
@@ -270,11 +370,19 @@ def listar_clientes():
     clientes_processados = []
     for c in clientes_brutos:
         lavagens_concluidas = [a for a in c.agendamentos if a.status == 'Lavagem Concluída']
+        lavagens_canceladas = [a for a in c.agendamentos if a.status == 'Cancelado']
+        
+        # Pega o último agendamento concluído para mostrar/editar feedback
+        ultimo_agendamento = lavagens_concluidas[-1] if lavagens_concluidas else None
+        
         clientes_processados.append({
-            'dados': c, 'motos': c.motos,
+            'dados': c, 
+            'motos': c.motos,
             'qtd_lavagens': len(lavagens_concluidas),
+            'qtd_canceladas': len(lavagens_canceladas),
             'total_gasto': sum(a.valor_cobrado for a in lavagens_concluidas),
-            'midias': [m for a in lavagens_concluidas for m in a.midias]
+            'midias': [m for a in lavagens_concluidas for m in a.midias],
+            'ultimo_agendamento': ultimo_agendamento
         })
     clientes_processados.sort(key=lambda x: x['total_gasto'], reverse=True)
     return render_template('clientes.html', clientes=clientes_processados, clientes_todos=clientes_brutos)
