@@ -3,6 +3,7 @@ import locale
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
 from datetime import datetime
+from sqlalchemy import text
 from database import db, Cliente, Moto, Agendamento, Produto, MidiaAgendamento, Servico
 
 app = Flask(__name__)
@@ -18,6 +19,35 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 
 db.init_app(app)
+
+# --- FUNÇÃO DE MIGRAÇÃO AUTOMÁTICA (CORREÇÃO DE BANCO) ---
+def verificar_migracoes_banco():
+    """
+    Verifica se as novas colunas existem no banco de dados.
+    Se não existirem, cria-as automaticamente para evitar Erro 500.
+    """
+    with app.app_context():
+        try:
+            with db.engine.connect() as conn:
+                # Lista de colunas para verificar/adicionar na tabela CLIENTES
+                colunas_clientes = [
+                    ("qtd_descontos", "INTEGER DEFAULT 0"),
+                    ("preferencias", "TEXT"),
+                    ("feedback_texto", "TEXT"),
+                    ("feedback_estrelas", "INTEGER DEFAULT 0")
+                ]
+                
+                for col, tipo in colunas_clientes:
+                    try:
+                        # Tenta adicionar a coluna. Se já existir, o banco retornará erro, que ignoramos.
+                        conn.execute(text(f"ALTER TABLE clientes ADD COLUMN {col} {tipo}"))
+                        conn.commit()
+                        print(f"--- Migração: Coluna '{col}' adicionada em Clientes. ---")
+                    except Exception:
+                        conn.rollback() # Coluna provavelmente já existe
+                        
+        except Exception as e:
+            print(f"Erro ao verificar migrações: {e}")
 
 def inicializar_servicos_padrao():
     try:
@@ -36,6 +66,7 @@ def inicializar_servicos_padrao():
 
 with app.app_context():
     db.create_all()
+    verificar_migracoes_banco() # <--- Executa a correção do banco ao iniciar
     inicializar_servicos_padrao()
 
 try:
@@ -172,7 +203,6 @@ def excluir_agendamento(id):
     try:
         a = Agendamento.query.get(id)
         if a:
-            # Remove mídias associadas se houver (opcional, mas boa prática)
             for midia in a.midias:
                 db.session.delete(midia)
             db.session.delete(a)
@@ -192,20 +222,17 @@ def cadastrar_cliente():
         endereco = request.form.get('endereco')
         quem_indicou_id = request.form.get('quem_indicou_id')
 
-        # Cria Cliente
         novo = Cliente(nome=nome, telefone=telefone, endereco=endereco)
         
-        # Regra: Indicação
         if quem_indicou_id:
             padrinho = Cliente.query.get(quem_indicou_id)
             if padrinho:
                 novo.indicado_por_id = padrinho.id
-                novo.qtd_descontos = 1 # O indicado ganha desconto na 1ª lavagem
+                novo.qtd_descontos = 1 
         
         db.session.add(novo)
-        db.session.flush() # Para gerar o ID
+        db.session.flush() 
         
-        # Cria Moto Principal
         moto = Moto(
             cliente_id=novo.id, 
             modelo=request.form.get('modelo_moto'), 
@@ -219,7 +246,6 @@ def cadastrar_cliente():
             return jsonify({'success': True, 'cliente': {'id': novo.id, 'nome': novo.nome, 'telefone': novo.telefone}, 'moto': moto.to_dict()})
 
         flash('Cliente cadastrado com sucesso!', 'success')
-        # Retorna para a página de onde veio
         if request.referrer and "clientes" in request.referrer: 
             return redirect(url_for('listar_clientes'))
             
@@ -234,9 +260,8 @@ def cadastrar_cliente():
 def buscar_cliente():
     termo = request.args.get('q', '').strip()
     if len(termo) < 1:
-        return jsonify([]) # Só busca se tiver pelo menos 1 letra
+        return jsonify([]) 
         
-    # Busca por nome OU telefone
     clientes = Cliente.query.filter(
         (Cliente.nome.ilike(f'%{termo}%')) | (Cliente.telefone.ilike(f'%{termo}%'))
     ).limit(10).all()
@@ -320,7 +345,6 @@ def atualizar_status(id, status):
         a.status = 'Lavagem Concluída'
         a.tempo_fim = horario_dt
         
-        # Baixa no Estoque (apenas se ainda não calculado)
         if a.custo_total_produtos == 0:
             custo = 0
             for p in Produto.query.all():
@@ -329,13 +353,9 @@ def atualizar_status(id, status):
                     custo += p.custo_por_dose
             a.custo_total_produtos = custo
         
-        # Lógica de Desconto para o Padrinho (Indicação)
-        # Se este cliente foi indicado por alguém
         if a.cliente.indicado_por_id:
-            # Verifica se é a primeira lavagem concluída deste cliente
             lavagens_concluidas = Agendamento.query.filter_by(cliente_id=a.cliente.id, status='Lavagem Concluída').count()
             if lavagens_concluidas == 1:
-                # Libera desconto para o Padrinho
                 padrinho = Cliente.query.get(a.cliente.indicado_por_id)
                 if padrinho:
                     padrinho.qtd_descontos += 1
