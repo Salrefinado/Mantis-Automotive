@@ -13,64 +13,116 @@
 
 <div class="bg-white rounded-xl shadow-lg p-6">
     <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
+        <table class="w-full text-left border-collapse align-middle">
             <thead>
-                <tr class="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider">
+                <tr class="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider border-b border-slate-200">
                     <th class="p-4 rounded-tl-lg">Cliente</th>
                     <th class="p-4">Motos</th>
-                    <th class="p-4 text-center">Lavagens</th>
-                    <th class="p-4 text-center">Total Gasto (LTV)</th>
-                    <th class="p-4 rounded-tr-lg text-center">Mídias</th>
+                    <th class="p-4 text-center">Histórico</th>
+                    <th class="p-4 text-center">LTV (Gasto Total)</th>
+                    <th class="p-4 w-48">Preferências</th>
+                    <th class="p-4 text-center w-32">Feedback</th>
+                    <th class="p-4 text-center rounded-tr-lg">Mídias</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
                 {% for c in clientes %}
                 <tr class="hover:bg-slate-50 transition group">
                     <td class="p-4">
-                        <div class="font-bold text-slate-800">{{ c.dados.nome }}</div>
-                        <div class="text-xs text-slate-400">{{ c.dados.telefone }}</div>
+                        <button onclick="abrirModalEditarCliente('{{ c.dados.id }}', '{{ c.dados.nome }}', '{{ c.dados.telefone }}', '{{ c.dados.endereco }}', '{{ c.dados.preferencias|replace('\n', ' ')|replace('\r', '') }}')" class="text-left group-hover:text-blue-600 transition">
+                            <div class="font-bold text-slate-800 text-base flex items-center gap-2">
+                                {{ c.dados.nome }}
+                                {% if c.dados.qtd_descontos > 0 %}
+                                    <span class="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-0.5 rounded-full border border-yellow-200" title="{{ c.dados.qtd_descontos }} descontos disponíveis">
+                                        <i class="fa-solid fa-ticket"></i> {{ c.dados.qtd_descontos }}
+                                    </span>
+                                {% endif %}
+                                <i class="fa-solid fa-pen text-slate-300 text-xs opacity-0 group-hover:opacity-100"></i>
+                            </div>
+                            <div class="text-xs text-slate-400 font-mono">{{ c.dados.telefone }}</div>
+                        </button>
                     </td>
+
                     <td class="p-4">
                         {% for m in c.motos %}
                             <div class="mb-1">
-                                <span class="inline-block bg-slate-200 text-slate-700 text-xs px-2 py-1 rounded">
+                                <span class="inline-block bg-slate-200 text-slate-700 text-xs px-2 py-1 rounded font-bold">
                                     {{ m.modelo }}
                                 </span>
                                 <span class="text-[10px] text-slate-400 border border-slate-200 px-1 rounded ml-1">{{ m.categoria }}</span>
                             </div>
                         {% endfor %}
                     </td>
+
                     <td class="p-4 text-center">
-                        <span class="font-bold text-blue-600">{{ c.qtd_lavagens }}</span>
+                        <div class="flex flex-col gap-1 items-center">
+                            <span class="text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded w-full max-w-[100px]">
+                                <i class="fa-solid fa-check mr-1"></i> {{ c.qtd_lavagens }}
+                            </span>
+                            {% if c.qtd_canceladas > 0 %}
+                            <span class="text-xs font-bold text-red-700 bg-red-100 px-2 py-1 rounded w-full max-w-[100px]">
+                                <i class="fa-solid fa-ban mr-1"></i> {{ c.qtd_canceladas }}
+                            </span>
+                            {% endif %}
+                        </div>
                     </td>
+
                     <td class="p-4 text-center">
-                        <span class="font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                        <span class="font-bold text-slate-700 text-sm">
                             R$ {{ "%.2f"|format(c.total_gasto) }}
                         </span>
                     </td>
+
+                    <td class="p-4">
+                        <div class="text-xs text-slate-600 italic cursor-pointer hover:bg-blue-50 p-2 rounded border border-transparent hover:border-blue-100 transition" 
+                             onclick="abrirModalEditarCliente('{{ c.dados.id }}', '{{ c.dados.nome }}', '{{ c.dados.telefone }}', '{{ c.dados.endereco }}', '{{ c.dados.preferencias|replace('\n', ' ')|replace('\r', '') }}')">
+                            {% if c.dados.preferencias %}
+                                "{{ c.dados.preferencias[:50] }}{{ '...' if c.dados.preferencias|length > 50 else '' }}"
+                            {% else %}
+                                <span class="text-slate-300">Sem preferências...</span>
+                            {% endif %}
+                        </div>
+                    </td>
+
+                    <td class="p-4 text-center">
+                        <button onclick="abrirModalFeedback('{{ c.dados.id }}', '{{ c.dados.feedback_estrelas }}', '{{ c.dados.feedback_texto|replace('\n', ' ')|replace('\r', '') }}')" 
+                           class="hover:scale-110 transition duration-200">
+                            <div class="text-yellow-400 text-sm mb-1">
+                                {% for i in range(1, 6) %}
+                                    {% if i <= c.dados.feedback_estrelas %}
+                                        <i class="fa-solid fa-star"></i>
+                                    {% else %}
+                                        <i class="fa-regular fa-star text-slate-300"></i>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            <div class="text-[10px] text-blue-600 underline">Avaliar/Ver</div>
+                        </button>
+                    </td>
+
                     <td class="p-4 text-center">
                         {% if c.midias %}
-                            <button onclick="document.getElementById('midia_{{ c.dados.id }}').classList.remove('hidden')" class="text-purple-600 hover:text-purple-800 font-bold text-sm underline flex items-center justify-center w-full">
-                                <i class="fa-solid fa-images mr-1"></i> Ver {{ c.midias|length }}
+                            <button onclick="document.getElementById('midia_{{ c.dados.id }}').classList.remove('hidden')" class="text-purple-600 hover:text-purple-800 font-bold text-sm bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded transition">
+                                <i class="fa-solid fa-images mr-1"></i> {{ c.midias|length }}
                             </button>
                             
-                            <div id="midia_{{ c.dados.id }}" class="fixed inset-0 bg-black bg-opacity-90 hidden z-50 p-4 md:p-10 overflow-y-auto" onclick="if(event.target === this) this.classList.add('hidden')">
+                            <div id="midia_{{ c.dados.id }}" class="fixed inset-0 bg-black bg-opacity-90 hidden z-[70] p-4 md:p-10 overflow-y-auto" onclick="if(event.target === this) this.classList.add('hidden')">
                                 <div class="flex justify-between items-center mb-4 text-white">
-                                    <h3 class="text-xl">Galeria de {{ c.dados.nome }}</h3>
-                                    <button onclick="document.getElementById('midia_{{ c.dados.id }}').classList.add('hidden')" class="text-3xl">&times;</button>
+                                    <h3 class="text-xl font-bold">Galeria de {{ c.dados.nome }}</h3>
+                                    <button onclick="document.getElementById('midia_{{ c.dados.id }}').classList.add('hidden')" class="text-4xl hover:text-red-500">&times;</button>
                                 </div>
                                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     {% for m in c.midias %}
                                         <div class="bg-white p-2 rounded shadow-lg">
                                             {% if m.tipo == 'foto' %}
-                                                <img src="{{ url_for('static', filename='uploads/' + m.caminho_arquivo) }}" class="w-full h-40 object-cover rounded cursor-pointer hover:opacity-90" onclick="window.open(this.src, '_blank')">
+                                                <img src="{{ url_for('static', filename='uploads/' + m.caminho_arquivo) }}" class="w-full h-40 object-cover rounded cursor-pointer hover:opacity-90 transition" onclick="window.open(this.src, '_blank')">
                                             {% else %}
                                                 <div class="bg-slate-200 h-40 flex items-center justify-center rounded text-slate-500 font-bold">
                                                     <i class="fa-solid fa-video mr-2"></i> Vídeo
                                                 </div>
-                                                <a href="{{ url_for('static', filename='uploads/' + m.caminho_arquivo) }}" target="_blank" class="block text-center text-blue-600 text-xs mt-1 underline">Assistir</a>
+                                                <a href="{{ url_for('static', filename='uploads/' + m.caminho_arquivo) }}" target="_blank" class="block text-center text-blue-600 text-xs mt-1 underline font-bold">Assistir Vídeo</a>
                                             {% endif %}
-                                            <p class="text-[10px] text-center mt-1 text-slate-500">{{ m.data_upload.strftime('%d/%m/%Y %H:%M') }}</p>
+                                            <p class="text-[10px] text-center mt-1 text-slate-500">{{ m.data_upload.strftime('%d/%m/%Y') }}</p>
                                         </div>
                                     {% endfor %}
                                 </div>
@@ -82,7 +134,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="5" class="p-8 text-center text-slate-400">Nenhum cliente cadastrado.</td>
+                    <td colspan="7" class="p-8 text-center text-slate-400">Nenhum cliente cadastrado.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -93,21 +145,21 @@
 <div id="modalNovoCliente" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
                 <h3 class="text-xl font-bold text-slate-800">Novo Cliente</h3>
                 <button onclick="document.getElementById('modalNovoCliente').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
             
             <form action="{{ url_for('cadastrar_cliente') }}" method="POST">
                 <div class="mb-3">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Dados Pessoais</label>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Dados Pessoais</label>
                     <input type="text" name="nome" placeholder="Nome Completo" class="w-full border p-2 rounded mb-2" required>
                     <input type="text" name="telefone" placeholder="WhatsApp" class="w-full border p-2 rounded mb-2" required>
                     <input type="text" name="endereco" placeholder="Endereço (Opcional)" class="w-full border p-2 rounded">
                 </div>
 
                 <div class="mb-3 border-t pt-3">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Primeira Moto</label>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Primeira Moto</label>
                     <div class="grid grid-cols-2 gap-2 mb-2">
                         <input type="text" name="modelo_moto" placeholder="Modelo (Ex: Titan)" class="border p-2 rounded" required>
                         <select name="categoria_moto" class="border p-2 rounded bg-white">
@@ -120,20 +172,115 @@
                     <input type="text" name="placa_moto" placeholder="Placa" class="w-full border p-2 rounded">
                 </div>
 
-                <div class="mb-4 bg-blue-50 p-2 rounded border border-blue-100">
-                    <label class="text-xs font-bold text-blue-800 uppercase">Indicação</label>
+                <div class="mb-4 bg-blue-50 p-3 rounded border border-blue-100">
+                    <label class="text-xs font-bold text-blue-800 uppercase block mb-1">Indicação (Quem indicou ganha desconto)</label>
                     <select name="quem_indicou_id" class="w-full border rounded p-1 select2-busca">
-                        <option value="">Quem indicou?</option>
+                        <option value="">Ninguém / Não informado</option>
                         {% for c in clientes_todos %}
                             <option value="{{ c.id }}">{{ c.nome }}</option>
                         {% endfor %}
                     </select>
                 </div>
 
-                <button type="submit" class="w-full bg-slate-900 text-white font-bold py-3 rounded-lg hover:bg-black">Salvar Cliente</button>
+                <button type="submit" class="w-full bg-slate-900 text-white font-bold py-3 rounded-lg hover:bg-black shadow-lg">Salvar Cliente</button>
             </form>
         </div>
     </div>
 </div>
+
+<div id="modalEditarCliente" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+        <h3 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Editar Dados do Cliente</h3>
+        <form action="{{ url_for('editar_cliente_dados') }}" method="POST">
+            <input type="hidden" name="cliente_id" id="edit_cliente_id">
+            
+            <div class="mb-3">
+                <label class="block text-sm font-bold text-slate-600 mb-1">Nome</label>
+                <input type="text" name="nome" id="edit_cliente_nome" class="w-full border p-2 rounded bg-slate-50" required>
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm font-bold text-slate-600 mb-1">WhatsApp</label>
+                <input type="text" name="telefone" id="edit_cliente_telefone" class="w-full border p-2 rounded bg-slate-50" required>
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm font-bold text-slate-600 mb-1">Endereço</label>
+                <input type="text" name="endereco" id="edit_cliente_endereco" class="w-full border p-2 rounded bg-slate-50">
+            </div>
+            <div class="mb-5">
+                <label class="block text-sm font-bold text-blue-700 mb-1"><i class="fa-solid fa-heart mr-1"></i> Preferências do Cliente</label>
+                <textarea name="preferencias" id="edit_cliente_preferencias" rows="4" class="w-full border-2 border-blue-100 p-2 rounded focus:border-blue-500 outline-none placeholder-slate-300" placeholder="Ex: Gosta de corrente bem lubrificada, cuidado com retrovisor..."></textarea>
+            </div>
+
+            <div class="flex gap-2">
+                <button type="button" onclick="document.getElementById('modalEditarCliente').classList.add('hidden')" class="flex-1 bg-gray-200 py-2 rounded text-slate-700 font-bold">Cancelar</button>
+                <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 shadow">Salvar Alterações</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="modalFeedback" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden z-[60] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
+        <h3 class="text-xl font-bold text-slate-800 mb-2">Avaliação do Serviço</h3>
+        <p class="text-sm text-slate-500 mb-4">Como o cliente avaliou a experiência?</p>
+        
+        <form action="{{ url_for('salvar_feedback') }}" method="POST">
+            <input type="hidden" name="cliente_id" id="feed_cliente_id">
+            
+            <div class="flex justify-center gap-2 text-3xl mb-4 text-slate-300" id="starContainer">
+                <i class="fa-star fa-regular cursor-pointer hover:text-yellow-400" data-val="1" onclick="setStars(1)"></i>
+                <i class="fa-star fa-regular cursor-pointer hover:text-yellow-400" data-val="2" onclick="setStars(2)"></i>
+                <i class="fa-star fa-regular cursor-pointer hover:text-yellow-400" data-val="3" onclick="setStars(3)"></i>
+                <i class="fa-star fa-regular cursor-pointer hover:text-yellow-400" data-val="4" onclick="setStars(4)"></i>
+                <i class="fa-star fa-regular cursor-pointer hover:text-yellow-400" data-val="5" onclick="setStars(5)"></i>
+            </div>
+            <input type="hidden" name="feedback_estrelas" id="inputEstrelas" value="0">
+
+            <textarea name="feedback_texto" id="feed_texto" rows="3" class="w-full border p-2 rounded mb-4 text-sm" placeholder="Comentário do cliente (Opcional)..."></textarea>
+
+            <div class="flex gap-2">
+                <button type="button" onclick="document.getElementById('modalFeedback').classList.add('hidden')" class="flex-1 bg-gray-200 py-2 rounded font-bold">Fechar</button>
+                <button type="submit" class="flex-1 bg-yellow-500 text-white py-2 rounded font-bold hover:bg-yellow-600 shadow">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function abrirModalEditarCliente(id, nome, telefone, endereco, preferencias) {
+        document.getElementById('edit_cliente_id').value = id;
+        document.getElementById('edit_cliente_nome').value = nome;
+        document.getElementById('edit_cliente_telefone').value = telefone;
+        document.getElementById('edit_cliente_endereco').value = (endereco && endereco !== 'None') ? endereco : '';
+        document.getElementById('edit_cliente_preferencias').value = (preferencias && preferencias !== 'None') ? preferencias : '';
+        document.getElementById('modalEditarCliente').classList.remove('hidden');
+    }
+
+    function abrirModalFeedback(id, estrelas, texto) {
+        document.getElementById('feed_cliente_id').value = id;
+        document.getElementById('feed_texto').value = (texto && texto !== 'None') ? texto : '';
+        setStars(estrelas || 0);
+        document.getElementById('modalFeedback').classList.remove('hidden');
+    }
+
+    function setStars(n) {
+        document.getElementById('inputEstrelas').value = n;
+        const stars = document.querySelectorAll('#starContainer i');
+        stars.forEach(s => {
+            const val = parseInt(s.dataset.val);
+            if (val <= n) {
+                s.classList.remove('fa-regular', 'text-slate-300');
+                s.classList.add('fa-solid', 'text-yellow-400');
+            } else {
+                s.classList.remove('fa-solid', 'text-yellow-400');
+                s.classList.add('fa-regular', 'text-slate-300');
+            }
+        });
+    }
+
+    $(document).ready(function() {
+        $('.select2-busca').select2({ width: '100%', placeholder: "Pesquisar..." });
+    });
+</script>
 
 {% endblock %}
