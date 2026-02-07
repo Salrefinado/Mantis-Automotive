@@ -79,7 +79,7 @@
         {% block content %}{% endblock %}
     </main>
 
-    <nav class="fixed bottom-0 left-0 w-full bg-mantis-dark text-gray-400 border-t border-zinc-800 md:hidden z-50 safe-area-bottom">
+    <nav class="fixed bottom-0 left-0 w-full bg-mantis-dark text-gray-400 border-t border-zinc-800 md:hidden z-40 safe-area-bottom">
         <div class="flex justify-around items-center py-3">
             <a href="{{ url_for('dashboard') }}" class="mobile-nav-item {{ 'text-blue-500 font-bold' if request.endpoint == 'dashboard' }}">
                 <i class="fa-solid fa-calendar-check text-xl mb-1"></i>
@@ -109,6 +109,8 @@
 
     <script>
         $(document).ready(function() {
+            // Inicialização genérica para selects simples que usem a classe .select2-busca
+            // (Modais específicos como Agendamento usam scripts próprios no template filho)
             $('.select2-busca').select2({
                 width: '100%',
                 placeholder: "Pesquisar...",
