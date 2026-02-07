@@ -3,7 +3,7 @@ import locale
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
 from datetime import datetime
-from sqlalchemy import or_
+from sqlalchemy import or_, text
 from database import db, Cliente, Moto, Agendamento, Produto, MidiaAgendamento, Servico
 
 app = Flask(__name__)
@@ -38,9 +38,42 @@ def inicializar_servicos_padrao():
     except Exception as e:
         print(f"Nota: Tabela de serviços ainda não pronta ou erro de conexão: {e}")
 
-# Criação das tabelas no contexto da aplicação
+# Função para corrigir o Schema do Banco (Adicionar colunas faltantes)
+def verificar_migracoes_banco():
+    try:
+        with db.engine.connect() as conn:
+            # Garante que as colunas novas existam (Postgres/SQLite compatível com limitações)
+            # Adiciona colunas em 'clientes'
+            try:
+                conn.execute(text("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS preferencias VARCHAR(500);"))
+            except Exception as e: 
+                print(f"Migração clientes (preferencias): {e}")
+
+            # Adiciona colunas em 'agendamentos'
+            try:
+                conn.execute(text("ALTER TABLE agendamentos ADD COLUMN IF NOT EXISTS feedback_estrelas INTEGER;"))
+            except Exception as e:
+                print(f"Migração agendamentos (feedback_estrelas): {e}")
+
+            try:
+                conn.execute(text("ALTER TABLE agendamentos ADD COLUMN IF NOT EXISTS feedback_texto VARCHAR(500);"))
+            except Exception as e:
+                print(f"Migração agendamentos (feedback_texto): {e}")
+                
+            try:
+                conn.execute(text("ALTER TABLE agendamentos ADD COLUMN IF NOT EXISTS gastos_extras FLOAT DEFAULT 0.0;"))
+            except Exception as e:
+                print(f"Migração agendamentos (gastos_extras): {e}")
+                
+            conn.commit()
+            print("--- Verificação de Schema Concluída ---")
+    except Exception as e:
+        print(f"Erro ao verificar migrações: {e}")
+
+# Criação das tabelas no contexto da aplicação e execução de correções
 with app.app_context():
     db.create_all()
+    verificar_migracoes_banco()
     inicializar_servicos_padrao()
 
 try:
