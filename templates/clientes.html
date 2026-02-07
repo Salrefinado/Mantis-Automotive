@@ -18,7 +18,8 @@
                 <tr class="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider border-b border-slate-200">
                     <th class="p-4 rounded-tl-lg">Cliente</th>
                     <th class="p-4">Motos</th>
-                    <th class="p-4 text-center">Histórico</th>
+                    <th class="p-4 text-center">Lavagens Feitas</th>
+                    <th class="p-4 text-center">Canceladas</th>
                     <th class="p-4 text-center">LTV (Gasto Total)</th>
                     <th class="p-4 w-48">Preferências</th>
                     <th class="p-4 text-center w-32">Feedback</th>
@@ -55,16 +56,19 @@
                     </td>
 
                     <td class="p-4 text-center">
-                        <div class="flex flex-col gap-1 items-center">
-                            <span class="text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded w-full max-w-[100px]">
-                                <i class="fa-solid fa-check mr-1"></i> {{ c.qtd_lavagens }}
-                            </span>
-                            {% if c.qtd_canceladas > 0 %}
-                            <span class="text-xs font-bold text-red-700 bg-red-100 px-2 py-1 rounded w-full max-w-[100px]">
-                                <i class="fa-solid fa-ban mr-1"></i> {{ c.qtd_canceladas }}
-                            </span>
-                            {% endif %}
-                        </div>
+                        <span class="text-xs font-bold text-green-700 bg-green-100 px-3 py-1 rounded-full border border-green-200 shadow-sm">
+                            <i class="fa-solid fa-check mr-1"></i> {{ c.qtd_lavagens }}
+                        </span>
+                    </td>
+
+                    <td class="p-4 text-center">
+                        {% if c.qtd_canceladas > 0 %}
+                        <span class="text-xs font-bold text-red-700 bg-red-100 px-3 py-1 rounded-full border border-red-200 shadow-sm">
+                            <i class="fa-solid fa-ban mr-1"></i> {{ c.qtd_canceladas }}
+                        </span>
+                        {% else %}
+                        <span class="text-xs text-slate-300">-</span>
+                        {% endif %}
                     </td>
 
                     <td class="p-4 text-center">
@@ -101,40 +105,55 @@
                     </td>
 
                     <td class="p-4 text-center">
-                        {% if c.midias %}
-                            <button onclick="document.getElementById('midia_{{ c.dados.id }}').classList.remove('hidden')" class="text-purple-600 hover:text-purple-800 font-bold text-sm bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded transition">
-                                <i class="fa-solid fa-images mr-1"></i> {{ c.midias|length }}
+                        <div class="flex flex-col gap-2 items-center">
+                            {% if c.midias %}
+                                <button onclick="document.getElementById('midia_{{ c.dados.id }}').classList.remove('hidden')" class="text-purple-600 hover:text-purple-800 font-bold text-xs bg-purple-50 hover:bg-purple-100 px-2 py-1 rounded transition border border-purple-200">
+                                    <i class="fa-solid fa-images mr-1"></i> {{ c.midias|length }} Ver
+                                </button>
+                            {% endif %}
+
+                            {% if c.agendamentos %}
+                            <button onclick="abrirModalUploadCliente({{ c.dados.id }})" class="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 font-bold bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 border border-blue-200 transition">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> Upload
                             </button>
-                            
-                            <div id="midia_{{ c.dados.id }}" class="fixed inset-0 bg-black bg-opacity-90 hidden z-[70] p-4 md:p-10 overflow-y-auto" onclick="if(event.target === this) this.classList.add('hidden')">
-                                <div class="flex justify-between items-center mb-4 text-white">
-                                    <h3 class="text-xl font-bold">Galeria de {{ c.dados.nome }}</h3>
-                                    <button onclick="document.getElementById('midia_{{ c.dados.id }}').classList.add('hidden')" class="text-4xl hover:text-red-500">&times;</button>
-                                </div>
-                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    {% for m in c.midias %}
-                                        <div class="bg-white p-2 rounded shadow-lg">
-                                            {% if m.tipo == 'foto' %}
-                                                <img src="{{ url_for('static', filename='uploads/' + m.caminho_arquivo) }}" class="w-full h-40 object-cover rounded cursor-pointer hover:opacity-90 transition" onclick="window.open(this.src, '_blank')">
-                                            {% else %}
-                                                <div class="bg-slate-200 h-40 flex items-center justify-center rounded text-slate-500 font-bold">
-                                                    <i class="fa-solid fa-video mr-2"></i> Vídeo
-                                                </div>
-                                                <a href="{{ url_for('static', filename='uploads/' + m.caminho_arquivo) }}" target="_blank" class="block text-center text-blue-600 text-xs mt-1 underline font-bold">Assistir Vídeo</a>
-                                            {% endif %}
-                                            <p class="text-[10px] text-center mt-1 text-slate-500">{{ m.data_upload.strftime('%d/%m/%Y') }}</p>
-                                        </div>
-                                    {% endfor %}
-                                </div>
+                            <select id="lista_agendamentos_{{ c.dados.id }}" class="hidden">
+                                {% for a in c.agendamentos %}
+                                    <option value="{{ a.id }}">
+                                        {{ a.data_agendada.strftime('%d/%m') }} - {{ a.moto.modelo }} ({{ a.status }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% endif %}
+                        </div>
+
+                        {% if c.midias %}
+                        <div id="midia_{{ c.dados.id }}" class="fixed inset-0 bg-black bg-opacity-90 hidden z-[70] p-4 md:p-10 overflow-y-auto" onclick="if(event.target === this) this.classList.add('hidden')">
+                            <div class="flex justify-between items-center mb-4 text-white">
+                                <h3 class="text-xl font-bold">Galeria de {{ c.dados.nome }}</h3>
+                                <button onclick="document.getElementById('midia_{{ c.dados.id }}').classList.add('hidden')" class="text-4xl hover:text-red-500">&times;</button>
                             </div>
-                        {% else %}
-                            <span class="text-slate-300">-</span>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {% for m in c.midias %}
+                                    <div class="bg-white p-2 rounded shadow-lg">
+                                        {% if m.tipo == 'foto' %}
+                                            <img src="{{ url_for('static', filename='uploads/' + m.caminho_arquivo) }}" class="w-full h-40 object-cover rounded cursor-pointer hover:opacity-90 transition" onclick="window.open(this.src, '_blank')">
+                                        {% else %}
+                                            <div class="bg-slate-200 h-40 flex items-center justify-center rounded text-slate-500 font-bold">
+                                                <i class="fa-solid fa-video mr-2"></i> Vídeo
+                                            </div>
+                                            <a href="{{ url_for('static', filename='uploads/' + m.caminho_arquivo) }}" target="_blank" class="block text-center text-blue-600 text-xs mt-1 underline font-bold">Assistir Vídeo</a>
+                                        {% endif %}
+                                        <p class="text-[10px] text-center mt-1 text-slate-500">{{ m.data_upload.strftime('%d/%m/%Y') }}</p>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
                         {% endif %}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="p-8 text-center text-slate-400">Nenhum cliente cadastrado.</td>
+                    <td colspan="8" class="p-8 text-center text-slate-400">Nenhum cliente cadastrado.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -246,6 +265,43 @@
     </div>
 </div>
 
+<div id="modalUploadCliente" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden z-[60] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-slate-800">Upload de Mídia</h3>
+            <button onclick="document.getElementById('modalUploadCliente').classList.add('hidden')" class="text-slate-400 hover:text-red-500">
+                <i class="fa-solid fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <form id="formUploadCliente" action="" method="POST" enctype="multipart/form-data">
+            <div class="mb-4">
+                <label class="block text-sm font-bold text-slate-700 mb-2">Para qual serviço?</label>
+                <select id="selectAgendamentoUpload" class="w-full border p-2 rounded bg-slate-50 text-sm" onchange="atualizarActionUpload()">
+                    </select>
+                <p class="text-[10px] text-slate-500 mt-1">Selecione o agendamento correto.</p>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-bold text-slate-700 mb-2">Arquivo</label>
+                <input type="file" name="arquivo" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" required>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-bold text-slate-700 mb-2">Tipo</label>
+                <div class="flex gap-4">
+                    <label class="flex items-center"><input type="radio" name="tipo" value="foto" checked class="mr-2"> Foto</label>
+                    <label class="flex items-center"><input type="radio" name="tipo" value="video" class="mr-2"> Vídeo</label>
+                </div>
+            </div>
+            
+            <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">
+                <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Enviar Agora
+            </button>
+        </form>
+    </div>
+</div>
+
 <script>
     function abrirModalEditarCliente(id, nome, telefone, endereco, preferencias) {
         document.getElementById('edit_cliente_id').value = id;
@@ -261,6 +317,29 @@
         document.getElementById('feed_texto').value = (texto && texto !== 'None') ? texto : '';
         setStars(estrelas || 0);
         document.getElementById('modalFeedback').classList.remove('hidden');
+    }
+    
+    // Função para abrir modal de upload preenchendo o select com os agendamentos do cliente
+    function abrirModalUploadCliente(clienteId) {
+        const selectOculto = document.getElementById('lista_agendamentos_' + clienteId);
+        const selectModal = document.getElementById('selectAgendamentoUpload');
+        
+        // Limpa e copia as opções
+        selectModal.innerHTML = selectOculto.innerHTML;
+        
+        if(selectModal.options.length > 0) {
+            selectModal.selectedIndex = 0;
+            atualizarActionUpload(); // Define o action inicial
+            document.getElementById('modalUploadCliente').classList.remove('hidden');
+        } else {
+            alert('Este cliente não possui agendamentos registrados para anexar mídia.');
+        }
+    }
+    
+    function atualizarActionUpload() {
+        const id = document.getElementById('selectAgendamentoUpload').value;
+        const form = document.getElementById('formUploadCliente');
+        form.action = "/upload_midia/" + id;
     }
 
     function setStars(n) {
