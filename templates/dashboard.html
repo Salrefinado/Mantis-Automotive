@@ -101,7 +101,7 @@
                         </button>
                     {% elif agenda.status == 'Em Lavagem' %}
                         <button onclick="abrirModalStatus('{{ agenda.id }}', 'Lavagem Concluída')" class="flex-1 bg-green-50 text-green-700 py-2 px-3 rounded text-center text-sm font-semibold hover:bg-green-100 border border-green-200 whitespace-nowrap transition">
-                            <i class="fa-solid fa-flag-checkered mr-1"></i> Concluir
+                            <i class="fa-solid fa-flag-checkered mr-1"></i> Lavagem Finalizada
                         </button>
                     {% else %}
                         <button onclick="abrirModalMidia('{{ agenda.id }}')" class="flex-1 bg-purple-50 text-purple-700 py-2 px-3 rounded text-center text-sm font-semibold hover:bg-purple-100 border border-purple-200">
@@ -380,8 +380,16 @@
         const form = document.getElementById('formAtualizarStatus');
         const titulo = document.getElementById('statusTitulo');
         
+        // Agora usamos o status passado diretamente (o backend trata se vier com %)
         form.action = "/atualizar_status/" + id + "/" + status;
-        titulo.innerText = status === 'Em Lavagem' ? 'Iniciar Lavagem' : 'Concluir Lavagem';
+        
+        if (status === 'Em Lavagem') {
+            titulo.innerText = 'Iniciar Lavagem';
+        } else if (status === 'Lavagem Concluída') {
+            titulo.innerText = 'Confirmar Lavagem Finalizada';
+        } else {
+            titulo.innerText = 'Atualizar Status';
+        }
         
         definirHoraAgora();
         modal.classList.remove('hidden');
