@@ -7,11 +7,8 @@ from database import db, Cliente, Moto, Agendamento, Produto, MidiaAgendamento, 
 
 app = Flask(__name__)
 
-# --- Configuração de Banco de Dados (Vercel/PostgreSQL vs Local/SQLite) ---
-# A Vercel fornece a conexão via variável de ambiente DATABASE_URL
+# --- Configuração de Banco de Dados ---
 database_url = os.environ.get('DATABASE_URL')
-
-# Ajuste necessário para compatibilidade com bibliotecas recentes (postgres:// -> postgresql://)
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
@@ -22,11 +19,8 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads'
 
 db.init_app(app)
 
-# Função para criar os serviços padrão se o banco estiver vazio
 def inicializar_servicos_padrao():
-    # Envolvemos em try/except para evitar erros em migrações ou conexões instáveis
     try:
-        # Verifica se a tabela existe e está vazia
         if Servico.query.first() is None:
             padroes = [
                 ('Naked', 'Standard Naked', 50.00), ('Naked', 'Premium Naked', 90.00),
@@ -37,22 +31,18 @@ def inicializar_servicos_padrao():
             for cat, nome, valor in padroes:
                 db.session.add(Servico(categoria=cat, nome=nome, valor=valor))
             db.session.commit()
-            print("--- Serviços Padrão Criados no Banco de Dados ---")
     except Exception as e:
-        print(f"Nota: Tabela de serviços ainda não pronta ou erro de conexão: {e}")
+        print(f"Erro ao inicializar serviços: {e}")
 
-# Criação das tabelas no contexto da aplicação
 with app.app_context():
     db.create_all()
     inicializar_servicos_padrao()
 
-# Tenta criar a pasta de uploads (pode falhar em sistemas de arquivo somente leitura como Vercel, mas não trava o app)
 try:
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 except OSError:
     pass
 
-# Filtro de Data em Português
 @app.template_filter('data_pt')
 def format_data_pt(value):
     if not value: return ""
@@ -70,7 +60,6 @@ def dashboard():
     produtos_alerta = Produto.query.filter(Produto.estoque_atual <= Produto.ponto_pedido).all()
     clientes_todos = Cliente.query.all()
     
-    # Busca preços do banco e formata para o Javascript do Dashboard
     servicos_db = Servico.query.all()
     tabela_precos = {}
     for s in servicos_db:
@@ -95,7 +84,6 @@ def financeiro():
     lucro_estimado = faturamento_total - custo_produtos_total
     ticket_medio = faturamento_total / len(concluidos) if concluidos else 0
     
-    # Busca a lista de serviços para edição
     servicos = Servico.query.order_by(Servico.categoria, Servico.valor).all()
     
     return render_template('financeiro.html', 
@@ -106,27 +94,21 @@ def financeiro():
                            qtd_servicos=len(concluidos),
                            servicos=servicos)
 
-# --- ATUALIZAR PREÇO ---
 @app.route('/atualizar_preco', methods=['POST'])
 def atualizar_preco():
     try:
         servico_id = request.form.get('id')
         novo_valor = request.form.get('valor')
-        
         servico = Servico.query.get(servico_id)
         if servico:
             servico.valor = float(novo_valor)
             db.session.commit()
-            flash(f'Preço de {servico.nome} atualizado para R$ {servico.valor:.2f}', 'success')
-        else:
-            flash('Serviço não encontrado.', 'error')
-            
+            flash('Preço atualizado!', 'success')
     except Exception as e:
-        flash(f'Erro ao atualizar preço: {str(e)}', 'error')
-        
+        flash(f'Erro: {e}', 'error')
     return redirect(url_for('financeiro'))
 
-# --- NOVO AGENDAMENTO ---
+# --- AGENDAMENTO ---
 @app.route('/novo_agendamento', methods=['POST'])
 def novo_agendamento():
     try:
@@ -134,16 +116,19 @@ def novo_agendamento():
         moto_id = request.form.get('moto_id')
         data_str = request.form.get('data_dia')
         hora_str = request.form.get('data_hora')
-        data_agendada = datetime.strptime(f"{data_str} {hora_str}", '%Y-%m-%d %H:%M')
         tipo_servico = request.form.get('tipo_servico')
         valor = float(request.form.get('valor'))
         
+        data_agendada = datetime.strptime(f"{data_str} {hora_str}", '%Y-%m-%d %H:%M')
+        
         cliente = Cliente.query.get(cliente_id)
         aplicar_desconto = False
-        if cliente.saldo_desconto:
-            valor = valor * 0.90
+        
+        # Lógica de Desconto (Pilha de Descontos)
+        if cliente.qtd_descontos > 0:
+            valor = valor * 0.90 # 10% de desconto
             aplicar_desconto = True
-            cliente.saldo_desconto = False 
+            cliente.qtd_descontos -= 1 # Consome um desconto
         
         novo_agendamento = Agendamento(
             cliente_id=cliente_id, moto_id=moto_id, data_agendada=data_agendada,
@@ -151,7 +136,9 @@ def novo_agendamento():
         )
         db.session.add(novo_agendamento)
         db.session.commit()
-        flash('Agendamento realizado!', 'success')
+        
+        msg_desconto = " (Com 10% de desconto!)" if aplicar_desconto else ""
+        flash(f'Agendamento realizado!{msg_desconto}', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Erro: {str(e)}', 'error')
@@ -180,38 +167,137 @@ def cancelar_agendamento(id):
         flash('Cancelado.', 'info')
     return redirect(url_for('dashboard'))
 
+@app.route('/excluir_agendamento/<int:id>')
+def excluir_agendamento(id):
+    try:
+        a = Agendamento.query.get(id)
+        if a:
+            # Remove mídias associadas se houver (opcional, mas boa prática)
+            for midia in a.midias:
+                db.session.delete(midia)
+            db.session.delete(a)
+            db.session.commit()
+            flash('Agendamento excluído permanentemente.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir: {e}', 'error')
+    return redirect(url_for('dashboard'))
+
+# --- GESTÃO DE CLIENTES ---
 @app.route('/cadastrar_cliente', methods=['POST'])
 def cadastrar_cliente():
     try:
-        novo = Cliente(nome=request.form.get('nome'), telefone=request.form.get('telefone'), endereco=request.form.get('endereco'))
-        quem = request.form.get('quem_indicou_id')
-        if quem:
-            novo.indicado_por_id = quem
-            padrinho = Cliente.query.get(quem)
-            if padrinho: padrinho.saldo_desconto = True
+        nome = request.form.get('nome')
+        telefone = request.form.get('telefone')
+        endereco = request.form.get('endereco')
+        quem_indicou_id = request.form.get('quem_indicou_id')
+
+        # Cria Cliente
+        novo = Cliente(nome=nome, telefone=telefone, endereco=endereco)
+        
+        # Regra: Indicação
+        if quem_indicou_id:
+            padrinho = Cliente.query.get(quem_indicou_id)
+            if padrinho:
+                novo.indicado_por_id = padrinho.id
+                novo.qtd_descontos = 1 # O indicado ganha desconto na 1ª lavagem
+        
         db.session.add(novo)
-        db.session.flush()
-        moto = Moto(cliente_id=novo.id, modelo=request.form.get('modelo_moto'), placa=request.form.get('placa_moto'), categoria=request.form.get('categoria_moto'))
+        db.session.flush() # Para gerar o ID
+        
+        # Cria Moto Principal
+        moto = Moto(
+            cliente_id=novo.id, 
+            modelo=request.form.get('modelo_moto'), 
+            placa=request.form.get('placa_moto'), 
+            categoria=request.form.get('categoria_moto')
+        )
         db.session.add(moto)
         db.session.commit()
         
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': True, 'cliente': {'id': novo.id, 'nome': novo.nome, 'telefone': novo.telefone}, 'moto': moto.to_dict()})
 
-        flash('Cadastrado!', 'success')
-        if request.headers.get("Referer") and "clientes" in request.headers.get("Referer"): return redirect(url_for('listar_clientes'))
+        flash('Cliente cadastrado com sucesso!', 'success')
+        # Retorna para a página de onde veio
+        if request.referrer and "clientes" in request.referrer: 
+            return redirect(url_for('listar_clientes'))
+            
     except Exception as e:
         db.session.rollback()
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest': return jsonify({'success': False, 'error': str(e)}), 400
         flash(f'Erro: {e}', 'error')
+    
     return redirect(url_for('dashboard'))
 
 @app.route('/api/buscar_cliente')
 def buscar_cliente():
-    termo = request.args.get('q', '')
-    clientes = Cliente.query.filter(Cliente.nome.ilike(f'%{termo}%')).limit(10).all()
-    return jsonify([{'id':c.id, 'text':f"{c.nome} - {c.telefone}", 'motos':[m.to_dict() for m in c.motos], 'tem_desconto':c.saldo_desconto} for c in clientes])
+    termo = request.args.get('q', '').strip()
+    if len(termo) < 1:
+        return jsonify([]) # Só busca se tiver pelo menos 1 letra
+        
+    # Busca por nome OU telefone
+    clientes = Cliente.query.filter(
+        (Cliente.nome.ilike(f'%{termo}%')) | (Cliente.telefone.ilike(f'%{termo}%'))
+    ).limit(10).all()
+    
+    return jsonify([{
+        'id': c.id, 
+        'text': f"{c.nome} - {c.telefone}", 
+        'motos': [m.to_dict() for m in c.motos], 
+        'qtd_descontos': c.qtd_descontos,
+        'preferencias': c.preferencias
+    } for c in clientes])
 
+@app.route('/api/adicionar_moto', methods=['POST'])
+def adicionar_moto():
+    try:
+        cliente_id = request.form.get('cliente_id')
+        modelo = request.form.get('modelo')
+        categoria = request.form.get('categoria')
+        placa = request.form.get('placa')
+        
+        nova_moto = Moto(cliente_id=cliente_id, modelo=modelo, categoria=categoria, placa=placa)
+        db.session.add(nova_moto)
+        db.session.commit()
+        return jsonify({'success': True, 'moto': nova_moto.to_dict()})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/editar_cliente_dados', methods=['POST'])
+def editar_cliente_dados():
+    try:
+        cid = request.form.get('cliente_id')
+        cliente = Cliente.query.get(cid)
+        if cliente:
+            cliente.nome = request.form.get('nome')
+            cliente.telefone = request.form.get('telefone')
+            cliente.endereco = request.form.get('endereco')
+            cliente.preferencias = request.form.get('preferencias')
+            db.session.commit()
+            flash('Dados do cliente atualizados.', 'success')
+    except Exception as e:
+        flash(f'Erro: {e}', 'error')
+    return redirect(url_for('listar_clientes'))
+
+@app.route('/salvar_feedback', methods=['POST'])
+def salvar_feedback():
+    try:
+        cid = request.form.get('cliente_id')
+        cliente = Cliente.query.get(cid)
+        if cliente:
+            cliente.feedback_texto = request.form.get('feedback_texto')
+            try:
+                cliente.feedback_estrelas = int(request.form.get('feedback_estrelas'))
+            except:
+                cliente.feedback_estrelas = 0
+            db.session.commit()
+            flash('Feedback salvo!', 'success')
+    except:
+        flash('Erro ao salvar feedback', 'error')
+    return redirect(url_for('listar_clientes'))
+
+# --- STATUS LAVAGEM ---
 @app.route('/atualizar_status/<int:id>/<status>', methods=['POST'])
 def atualizar_status(id, status):
     a = Agendamento.query.get(id)
@@ -219,16 +305,22 @@ def atualizar_status(id, status):
     
     if horario_str:
         agora = datetime.now()
-        horario_dt = datetime.strptime(horario_str, '%H:%M').replace(year=agora.year, month=agora.month, day=agora.day)
+        try:
+            horario_dt = datetime.strptime(horario_str, '%H:%M').replace(year=agora.year, month=agora.month, day=agora.day)
+        except:
+            horario_dt = datetime.now()
     else:
         horario_dt = datetime.now()
 
     if status == 'Em Lavagem':
-        a.status = status
+        a.status = 'Em Lavagem'
         a.tempo_inicio = horario_dt
+        
     elif status == 'Lavagem Concluída':
-        a.status = status
+        a.status = 'Lavagem Concluída'
         a.tempo_fim = horario_dt
+        
+        # Baixa no Estoque (apenas se ainda não calculado)
         if a.custo_total_produtos == 0:
             custo = 0
             for p in Produto.query.all():
@@ -236,14 +328,24 @@ def atualizar_status(id, status):
                     p.estoque_atual -= p.gasto_medio_lavagem
                     custo += p.custo_por_dose
             a.custo_total_produtos = custo
-            
+        
+        # Lógica de Desconto para o Padrinho (Indicação)
+        # Se este cliente foi indicado por alguém
+        if a.cliente.indicado_por_id:
+            # Verifica se é a primeira lavagem concluída deste cliente
+            lavagens_concluidas = Agendamento.query.filter_by(cliente_id=a.cliente.id, status='Lavagem Concluída').count()
+            if lavagens_concluidas == 1:
+                # Libera desconto para o Padrinho
+                padrinho = Cliente.query.get(a.cliente.indicado_por_id)
+                if padrinho:
+                    padrinho.qtd_descontos += 1
+    
     db.session.commit()
     flash(f'Status atualizado para {status} às {horario_dt.strftime("%H:%M")}', 'info')
     return redirect(url_for('dashboard'))
 
 @app.route('/upload_midia/<int:agendamento_id>', methods=['POST'])
 def upload_midia(agendamento_id):
-    # Nota: Em Vercel, uploads locais são temporários e serão deletados após a execução.
     if 'arquivo' not in request.files: return 'Erro', 400
     arquivo = request.files['arquivo']
     if arquivo:
@@ -268,15 +370,22 @@ def gerenciar_produtos():
 def listar_clientes():
     clientes_brutos = Cliente.query.all()
     clientes_processados = []
+    
     for c in clientes_brutos:
         lavagens_concluidas = [a for a in c.agendamentos if a.status == 'Lavagem Concluída']
+        lavagens_canceladas = [a for a in c.agendamentos if a.status == 'Cancelado']
+        
         clientes_processados.append({
-            'dados': c, 'motos': c.motos,
+            'dados': c, 
+            'motos': c.motos,
             'qtd_lavagens': len(lavagens_concluidas),
+            'qtd_canceladas': len(lavagens_canceladas),
             'total_gasto': sum(a.valor_cobrado for a in lavagens_concluidas),
             'midias': [m for a in lavagens_concluidas for m in a.midias]
         })
+    
     clientes_processados.sort(key=lambda x: x['total_gasto'], reverse=True)
     return render_template('clientes.html', clientes=clientes_processados, clientes_todos=clientes_brutos)
 
-if __name__ == '__main__': app.run(debug=True, host='0.0.0.0')
+if __name__ == '__main__': 
+    app.run(debug=True, host='0.0.0.0')
