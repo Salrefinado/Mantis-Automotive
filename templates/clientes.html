@@ -321,4 +321,166 @@
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-bold text-slate-800">Upload de Mídia</h3>
-            <button onclick="document.getElementById('
+            <button onclick="document.getElementById('modalUploadCliente').classList.add('hidden')" class="text-slate-400 hover:text-red-500">
+                <i class="fa-solid fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <form id="formUploadCliente" action="" method="POST" enctype="multipart/form-data" onsubmit="return validarTamanhoArquivo(this)">
+            <div class="mb-4">
+                <label class="block text-sm font-bold text-slate-700 mb-2">Para qual serviço?</label>
+                <select id="selectAgendamentoUpload" class="w-full border p-2 rounded bg-slate-50 text-sm" onchange="atualizarActionUpload()">
+                    </select>
+                <p class="text-[10px] text-slate-500 mt-1">Selecione o agendamento correto.</p>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-bold text-slate-700 mb-2">Arquivo</label>
+                <input type="file" name="arquivo" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" required>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-bold text-slate-700 mb-2">Tipo</label>
+                <div class="flex gap-4">
+                    <label class="flex items-center"><input type="radio" name="tipo" value="foto" checked class="mr-2"> Foto</label>
+                    <label class="flex items-center"><input type="radio" name="tipo" value="video" class="mr-2"> Vídeo</label>
+                </div>
+            </div>
+            
+            <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">
+                <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Enviar Agora
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    function abrirModalEditarCliente(id, nome, telefone, endereco, preferencias, quemIndicou) {
+        document.getElementById('edit_cliente_id').value = id;
+        document.getElementById('edit_cliente_nome').value = nome;
+        document.getElementById('edit_cliente_telefone').value = telefone;
+        document.getElementById('edit_cliente_endereco').value = (endereco && endereco !== 'None') ? endereco : '';
+        document.getElementById('edit_cliente_preferencias').value = (preferencias && preferencias !== 'None') ? preferencias : '';
+        
+        // Exibir Quem Indicou
+        const divInd = document.getElementById('divQuemIndicou');
+        if (quemIndicou && quemIndicou !== 'None' && quemIndicou !== '') {
+            document.getElementById('txtQuemIndicou').innerText = quemIndicou;
+            divInd.classList.remove('hidden');
+        } else {
+            divInd.classList.add('hidden');
+        }
+
+        document.getElementById('modalEditarCliente').classList.remove('hidden');
+    }
+
+    function abrirModalMotos(clienteId, clienteNome) {
+        document.getElementById('tituloMotosCliente').innerText = clienteNome;
+        document.getElementById('inputMotosClienteId').value = clienteId;
+        
+        const container = document.getElementById('listaMotosContainer');
+        container.innerHTML = ''; // Limpa lista anterior
+
+        // Recupera o JSON embutido no HTML
+        const scriptTag = document.getElementById('motos-data-' + clienteId);
+        let motos = [];
+        if (scriptTag) {
+            try { motos = JSON.parse(scriptTag.textContent); } catch(e) { console.error('Erro ao parsear motos', e); }
+        }
+
+        if (motos.length === 0) {
+            container.innerHTML = '<p class="text-sm text-slate-400 italic text-center">Nenhum veículo cadastrado ainda.</p>';
+        } else {
+            motos.forEach(moto => {
+                const item = document.createElement('div');
+                item.className = 'bg-slate-50 border border-slate-200 rounded p-3 text-sm';
+                item.innerHTML = `
+                    <form action="{{ url_for('salvar_moto_cliente') }}" method="POST" class="flex flex-col gap-2">
+                        <input type="hidden" name="moto_id" value="${moto.id}">
+                        <div class="flex gap-2 items-center">
+                            <input type="text" name="modelo" value="${moto.modelo}" class="flex-1 border p-1 rounded font-bold text-slate-700" required>
+                            <input type="text" name="placa" value="${moto.placa || ''}" class="w-24 border p-1 rounded text-slate-600" placeholder="Placa">
+                        </div>
+                        <div class="flex gap-2 items-center">
+                            <select name="categoria" class="flex-1 border p-1 rounded bg-white text-xs">
+                                <option value="Naked" ${moto.categoria === 'Naked' ? 'selected' : ''}>Naked</option>
+                                <option value="Sport" ${moto.categoria === 'Sport' ? 'selected' : ''}>Sport</option>
+                                <option value="Custom" ${moto.categoria === 'Custom' ? 'selected' : ''}>Custom</option>
+                                <option value="BigTrail" ${moto.categoria === 'BigTrail' ? 'selected' : ''}>Big Trail</option>
+                            </select>
+                            <button type="submit" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-xs font-bold shadow">
+                                <i class="fa-solid fa-save"></i> Salvar
+                            </button>
+                        </div>
+                    </form>
+                `;
+                container.appendChild(item);
+            });
+        }
+        
+        document.getElementById('modalMotosCliente').classList.remove('hidden');
+    }
+
+    function abrirModalFeedback(id, estrelas, texto) {
+        document.getElementById('feed_cliente_id').value = id;
+        document.getElementById('feed_texto').value = (texto && texto !== 'None') ? texto : '';
+        setStars(estrelas || 0);
+        document.getElementById('modalFeedback').classList.remove('hidden');
+    }
+    
+    // Função para abrir modal de upload preenchendo o select com os agendamentos do cliente
+    function abrirModalUploadCliente(clienteId) {
+        const selectOculto = document.getElementById('lista_agendamentos_' + clienteId);
+        const selectModal = document.getElementById('selectAgendamentoUpload');
+        
+        // Limpa e copia as opções
+        selectModal.innerHTML = selectOculto.innerHTML;
+        
+        if(selectModal.options.length > 0) {
+            selectModal.selectedIndex = 0;
+            atualizarActionUpload(); // Define o action inicial
+            document.getElementById('modalUploadCliente').classList.remove('hidden');
+        } else {
+            alert('Este cliente não possui agendamentos registrados para anexar mídia.');
+        }
+    }
+    
+    function atualizarActionUpload() {
+        const id = document.getElementById('selectAgendamentoUpload').value;
+        const form = document.getElementById('formUploadCliente');
+        form.action = "/upload_midia/" + id;
+    }
+
+    function validarTamanhoArquivo(form) {
+        const input = form.querySelector('input[type="file"]');
+        if (input.files && input.files[0]) {
+            const fileSizeMB = input.files[0].size / 1024 / 1024;
+            if (fileSizeMB > 4.5) {
+                alert('⚠️ ARQUIVO MUITO GRANDE!\n\nO limite para upload é de 4.5MB por arquivo.\nSeu arquivo tem ' + fileSizeMB.toFixed(2) + 'MB.\n\nPor favor, envie um arquivo menor ou reduza a qualidade.');
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function setStars(n) {
+        document.getElementById('inputEstrelas').value = n;
+        const stars = document.querySelectorAll('#starContainer i');
+        stars.forEach(s => {
+            const val = parseInt(s.dataset.val);
+            if (val <= n) {
+                s.classList.remove('fa-regular', 'text-slate-300');
+                s.classList.add('fa-solid', 'text-yellow-400');
+            } else {
+                s.classList.remove('fa-solid', 'text-yellow-400');
+                s.classList.add('fa-regular', 'text-slate-300');
+            }
+        });
+    }
+
+    $(document).ready(function() {
+        $('.select2-busca').select2({ width: '100%', placeholder: "Pesquisar..." });
+    });
+</script>
+
+{% endblock %}
