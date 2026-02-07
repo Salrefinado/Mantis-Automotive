@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from sqlalchemy import text
+from urllib.parse import unquote
 from database import db, Cliente, Moto, Agendamento, Produto, MidiaAgendamento, Servico
 
 app = Flask(__name__)
@@ -322,9 +323,11 @@ def salvar_feedback():
         flash('Erro ao salvar feedback', 'error')
     return redirect(url_for('listar_clientes'))
 
-# --- STATUS LAVAGEM ---
+# --- STATUS LAVAGEM (CORREÇÃO DO BUG %20) ---
 @app.route('/atualizar_status/<int:id>/<status>', methods=['POST'])
 def atualizar_status(id, status):
+    status = unquote(status) # Decodifica URL (Em%20Lavagem -> Em Lavagem)
+    
     a = Agendamento.query.get(id)
     horario_str = request.form.get('horario')
     
@@ -373,7 +376,7 @@ def upload_midia(agendamento_id):
         arquivo.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         db.session.add(MidiaAgendamento(agendamento_id=agendamento_id, caminho_arquivo=filename, tipo=request.form.get('tipo')))
         db.session.commit()
-    return redirect(url_for('dashboard'))
+    return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/produtos', methods=['GET', 'POST'])
 def gerenciar_produtos():
@@ -392,12 +395,15 @@ def listar_clientes():
     clientes_processados = []
     
     for c in clientes_brutos:
+        # Pega agendamentos ordenados do mais recente para o antigo para facilitar upload
+        agendamentos_recentes = sorted(c.agendamentos, key=lambda x: x.data_agendada, reverse=True)
         lavagens_concluidas = [a for a in c.agendamentos if a.status == 'Lavagem Concluída']
         lavagens_canceladas = [a for a in c.agendamentos if a.status == 'Cancelado']
         
         clientes_processados.append({
             'dados': c, 
             'motos': c.motos,
+            'agendamentos': agendamentos_recentes, # Necessário para o modal de upload
             'qtd_lavagens': len(lavagens_concluidas),
             'qtd_canceladas': len(lavagens_canceladas),
             'total_gasto': sum(a.valor_cobrado for a in lavagens_concluidas),
