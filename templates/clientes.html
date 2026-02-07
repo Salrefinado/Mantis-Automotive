@@ -30,7 +30,7 @@
                 {% for c in clientes %}
                 <tr class="hover:bg-slate-50 transition group">
                     <td class="p-4">
-                        <button onclick="abrirModalEditarCliente('{{ c.dados.id }}', '{{ c.dados.nome }}', '{{ c.dados.telefone }}', '{{ c.dados.endereco }}', '{{ c.dados.preferencias|replace('\n', ' ')|replace('\r', '') }}')" class="text-left group-hover:text-blue-600 transition">
+                        <button onclick="abrirModalEditarCliente('{{ c.dados.id }}', '{{ c.dados.nome }}', '{{ c.dados.telefone }}', '{{ c.dados.endereco }}', '{{ c.dados.preferencias|replace('\n', ' ')|replace('\r', '') }}', '{{ c.dados.padrinho.nome if c.dados.padrinho else '' }}')" class="text-left group-hover:text-blue-600 transition">
                             <div class="font-bold text-slate-800 text-base flex items-center gap-2">
                                 {{ c.dados.nome }}
                                 {% if c.dados.qtd_descontos > 0 %}
@@ -45,14 +45,25 @@
                     </td>
 
                     <td class="p-4">
-                        {% for m in c.motos %}
-                            <div class="mb-1">
-                                <span class="inline-block bg-slate-200 text-slate-700 text-xs px-2 py-1 rounded font-bold">
-                                    {{ m.modelo }}
-                                </span>
-                                <span class="text-[10px] text-slate-400 border border-slate-200 px-1 rounded ml-1">{{ m.categoria }}</span>
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex-1">
+                                {% for m in c.motos %}
+                                    <div class="mb-1">
+                                        <span class="inline-block bg-slate-200 text-slate-700 text-xs px-2 py-1 rounded font-bold">
+                                            {{ m.modelo }}
+                                        </span>
+                                        <span class="text-[10px] text-slate-400 border border-slate-200 px-1 rounded ml-1">{{ m.categoria }}</span>
+                                    </div>
+                                {% endfor %}
                             </div>
-                        {% endfor %}
+                            <button onclick="abrirModalMotos('{{ c.dados.id }}', '{{ c.dados.nome }}')" class="text-slate-400 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition" title="Gerenciar Veículos">
+                                <i class="fa-solid fa-gear"></i>
+                            </button>
+                        </div>
+                        
+                        <script type="application/json" id="motos-data-{{ c.dados.id }}">
+                            {{ c.motos|map(attribute='to_dict')|list|tojson }}
+                        </script>
                     </td>
 
                     <td class="p-4 text-center">
@@ -79,7 +90,7 @@
 
                     <td class="p-4">
                         <div class="text-xs text-slate-600 italic cursor-pointer hover:bg-blue-50 p-2 rounded border border-transparent hover:border-blue-100 transition" 
-                             onclick="abrirModalEditarCliente('{{ c.dados.id }}', '{{ c.dados.nome }}', '{{ c.dados.telefone }}', '{{ c.dados.endereco }}', '{{ c.dados.preferencias|replace('\n', ' ')|replace('\r', '') }}')">
+                             onclick="abrirModalEditarCliente('{{ c.dados.id }}', '{{ c.dados.nome }}', '{{ c.dados.telefone }}', '{{ c.dados.endereco }}', '{{ c.dados.preferencias|replace('\n', ' ')|replace('\r', '') }}', '{{ c.dados.padrinho.nome if c.dados.padrinho else '' }}')">
                             {% if c.dados.preferencias %}
                                 "{{ c.dados.preferencias[:50] }}{{ '...' if c.dados.preferencias|length > 50 else '' }}"
                             {% else %}
@@ -225,6 +236,15 @@
                 <label class="block text-sm font-bold text-slate-600 mb-1">Endereço</label>
                 <input type="text" name="endereco" id="edit_cliente_endereco" class="w-full border p-2 rounded bg-slate-50">
             </div>
+
+            <div class="mb-3" id="divQuemIndicou">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Indicado Por:</label>
+                <div class="bg-yellow-50 text-yellow-800 p-2 rounded border border-yellow-200 text-sm font-medium flex items-center">
+                    <i class="fa-solid fa-user-tag mr-2"></i>
+                    <span id="txtQuemIndicou"></span>
+                </div>
+            </div>
+
             <div class="mb-5">
                 <label class="block text-sm font-bold text-blue-700 mb-1"><i class="fa-solid fa-heart mr-1"></i> Preferências do Cliente</label>
                 <textarea name="preferencias" id="edit_cliente_preferencias" rows="4" class="w-full border-2 border-blue-100 p-2 rounded focus:border-blue-500 outline-none placeholder-slate-300" placeholder="Ex: Gosta de corrente bem lubrificada, cuidado com retrovisor..."></textarea>
@@ -235,6 +255,38 @@
                 <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 shadow">Salvar Alterações</button>
             </div>
         </form>
+    </div>
+</div>
+
+<div id="modalMotosCliente" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden z-[55] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h3 class="text-xl font-bold text-slate-800">Veículos de <span id="tituloMotosCliente" class="text-blue-600"></span></h3>
+                <button onclick="document.getElementById('modalMotosCliente').classList.add('hidden')" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+
+            <div id="listaMotosContainer" class="space-y-3 mb-6">
+                </div>
+
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <h4 class="text-sm font-bold text-slate-700 mb-2"><i class="fa-solid fa-plus-circle text-green-600"></i> Adicionar Nova Moto</h4>
+                <form action="{{ url_for('salvar_moto_cliente') }}" method="POST">
+                    <input type="hidden" name="cliente_id" id="inputMotosClienteId">
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <input type="text" name="modelo" placeholder="Modelo" class="border p-2 rounded text-sm" required>
+                        <input type="text" name="placa" placeholder="Placa" class="border p-2 rounded text-sm">
+                    </div>
+                    <select name="categoria" class="w-full border p-2 rounded bg-white text-sm mb-2">
+                        <option value="Naked">Naked</option>
+                        <option value="Sport">Sport</option>
+                        <option value="Custom">Custom</option>
+                        <option value="BigTrail">Big Trail</option>
+                    </select>
+                    <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 rounded hover:bg-green-700 text-sm shadow">Adicionar</button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -269,111 +321,4 @@
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-bold text-slate-800">Upload de Mídia</h3>
-            <button onclick="document.getElementById('modalUploadCliente').classList.add('hidden')" class="text-slate-400 hover:text-red-500">
-                <i class="fa-solid fa-times text-xl"></i>
-            </button>
-        </div>
-        
-        <form id="formUploadCliente" action="" method="POST" enctype="multipart/form-data" onsubmit="return validarTamanhoArquivo(this)">
-            <div class="mb-4">
-                <label class="block text-sm font-bold text-slate-700 mb-2">Para qual serviço?</label>
-                <select id="selectAgendamentoUpload" class="w-full border p-2 rounded bg-slate-50 text-sm" onchange="atualizarActionUpload()">
-                    </select>
-                <p class="text-[10px] text-slate-500 mt-1">Selecione o agendamento correto.</p>
-            </div>
-
-            <div class="mb-4">
-                <label class="block text-sm font-bold text-slate-700 mb-2">Arquivo</label>
-                <input type="file" name="arquivo" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" required>
-            </div>
-            
-            <div class="mb-6">
-                <label class="block text-sm font-bold text-slate-700 mb-2">Tipo</label>
-                <div class="flex gap-4">
-                    <label class="flex items-center"><input type="radio" name="tipo" value="foto" checked class="mr-2"> Foto</label>
-                    <label class="flex items-center"><input type="radio" name="tipo" value="video" class="mr-2"> Vídeo</label>
-                </div>
-            </div>
-            
-            <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">
-                <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Enviar Agora
-            </button>
-        </form>
-    </div>
-</div>
-
-<script>
-    function abrirModalEditarCliente(id, nome, telefone, endereco, preferencias) {
-        document.getElementById('edit_cliente_id').value = id;
-        document.getElementById('edit_cliente_nome').value = nome;
-        document.getElementById('edit_cliente_telefone').value = telefone;
-        document.getElementById('edit_cliente_endereco').value = (endereco && endereco !== 'None') ? endereco : '';
-        document.getElementById('edit_cliente_preferencias').value = (preferencias && preferencias !== 'None') ? preferencias : '';
-        document.getElementById('modalEditarCliente').classList.remove('hidden');
-    }
-
-    function abrirModalFeedback(id, estrelas, texto) {
-        document.getElementById('feed_cliente_id').value = id;
-        document.getElementById('feed_texto').value = (texto && texto !== 'None') ? texto : '';
-        setStars(estrelas || 0);
-        document.getElementById('modalFeedback').classList.remove('hidden');
-    }
-    
-    // Função para abrir modal de upload preenchendo o select com os agendamentos do cliente
-    function abrirModalUploadCliente(clienteId) {
-        const selectOculto = document.getElementById('lista_agendamentos_' + clienteId);
-        const selectModal = document.getElementById('selectAgendamentoUpload');
-        
-        // Limpa e copia as opções
-        selectModal.innerHTML = selectOculto.innerHTML;
-        
-        if(selectModal.options.length > 0) {
-            selectModal.selectedIndex = 0;
-            atualizarActionUpload(); // Define o action inicial
-            document.getElementById('modalUploadCliente').classList.remove('hidden');
-        } else {
-            alert('Este cliente não possui agendamentos registrados para anexar mídia.');
-        }
-    }
-    
-    function atualizarActionUpload() {
-        const id = document.getElementById('selectAgendamentoUpload').value;
-        const form = document.getElementById('formUploadCliente');
-        form.action = "/upload_midia/" + id;
-    }
-
-    // NOVA FUNÇÃO: Validação de tamanho do arquivo antes do envio (Evita erro 413)
-    function validarTamanhoArquivo(form) {
-        const input = form.querySelector('input[type="file"]');
-        if (input.files && input.files[0]) {
-            const fileSizeMB = input.files[0].size / 1024 / 1024;
-            // Limite de 4.5MB (margem de segurança para o limite de 4.5MB da Vercel)
-            if (fileSizeMB > 4.5) {
-                alert('⚠️ ARQUIVO MUITO GRANDE!\n\nO limite para upload é de 4.5MB por arquivo.\nSeu arquivo tem ' + fileSizeMB.toFixed(2) + 'MB.\n\nPor favor, envie um arquivo menor ou reduza a qualidade.');
-                return false;
-            }
-        }
-        return true;
-    }
-
-    function setStars(n) {
-        document.getElementById('inputEstrelas').value = n;
-        const stars = document.querySelectorAll('#starContainer i');
-        stars.forEach(s => {
-            const val = parseInt(s.dataset.val);
-            if (val <= n) {
-                s.classList.remove('fa-regular', 'text-slate-300');
-                s.classList.add('fa-solid', 'text-yellow-400');
-            } else {
-                s.classList.remove('fa-solid', 'text-yellow-400');
-                s.classList.add('fa-regular', 'text-slate-300');
-            }
-        });
-    }
-
-    $(document).ready(function() {
-        $('.select2-busca').select2({ width: '100%', placeholder: "Pesquisar..." });
-    });
-</script>
-
-{% endblock %}
+            <button onclick="document.getElementById('
