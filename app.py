@@ -18,6 +18,8 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chave-secreta-trocar-em
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url if database_url else 'sqlite:///lavagem.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
+# Aumenta o limite de upload do Flask para 64MB (ajuda a evitar 413 no lado do Python)
+app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024 
 
 db.init_app(app)
 
@@ -157,10 +159,12 @@ def novo_agendamento():
         aplicar_desconto = False
         
         # Lógica de Desconto (Pilha de Descontos)
+        # O desconto é consumido na reserva para garantir que o cliente não use o mesmo crédito em 2 agendamentos simultâneos.
+        # SE O AGENDAMENTO FOR CANCELADO, O CRÉDITO É DEVOLVIDO (ver rota cancelar_agendamento).
         if cliente.qtd_descontos > 0:
             valor = valor * 0.90 # 10% de desconto
             aplicar_desconto = True
-            cliente.qtd_descontos -= 1 # Consome um desconto
+            cliente.qtd_descontos -= 1 # Consome um desconto (será devolvido se cancelar)
         
         novo_agendamento = Agendamento(
             cliente_id=cliente_id, moto_id=moto_id, data_agendada=data_agendada,
@@ -194,9 +198,13 @@ def editar_agendamento():
 def cancelar_agendamento(id):
     a = Agendamento.query.get(id)
     if a:
+        # CORREÇÃO: Se o agendamento tinha desconto e não foi concluído, devolve o crédito ao cliente.
+        if a.status != 'Cancelado' and a.desconto_aplicado:
+            a.cliente.qtd_descontos += 1
+            
         a.status = 'Cancelado'
         db.session.commit()
-        flash('Cancelado.', 'info')
+        flash('Cancelado. (Se havia desconto, foi devolvido)', 'info')
     return redirect(url_for('dashboard'))
 
 @app.route('/excluir_agendamento/<int:id>')
@@ -204,6 +212,10 @@ def excluir_agendamento(id):
     try:
         a = Agendamento.query.get(id)
         if a:
+            # CORREÇÃO: Se excluir um agendamento válido com desconto, devolve o crédito.
+            if a.status != 'Cancelado' and a.desconto_aplicado:
+                a.cliente.qtd_descontos += 1
+
             for midia in a.midias:
                 db.session.delete(midia)
             db.session.delete(a)
@@ -372,6 +384,7 @@ def upload_midia(agendamento_id):
     if 'arquivo' not in request.files: return 'Erro', 400
     arquivo = request.files['arquivo']
     if arquivo:
+        # A validação de tamanho real deve ser feita no Frontend para evitar erro 413 do Nginx/Vercel
         filename = secure_filename(f"{agendamento_id}_{datetime.now().timestamp()}_{arquivo.filename}")
         arquivo.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         db.session.add(MidiaAgendamento(agendamento_id=agendamento_id, caminho_arquivo=filename, tipo=request.form.get('tipo')))
