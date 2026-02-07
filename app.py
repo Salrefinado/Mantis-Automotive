@@ -37,7 +37,8 @@ def verificar_migracoes_banco():
                     ("qtd_descontos", "INTEGER DEFAULT 0"),
                     ("preferencias", "TEXT"),
                     ("feedback_texto", "TEXT"),
-                    ("feedback_estrelas", "INTEGER DEFAULT 0")
+                    ("feedback_estrelas", "INTEGER DEFAULT 0"),
+                    ("indicado_por_id", "INTEGER") # <--- ADICIONADO PARA CORRIGIR O ERRO 500
                 ]
                 
                 for col, tipo in colunas_clientes:
