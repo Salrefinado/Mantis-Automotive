@@ -16,7 +16,14 @@ class Cliente(db.Model):
     data_cadastro = db.Column(db.DateTime, default=datetime.utcnow)
     
     indicado_por_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
-    saldo_desconto = db.Column(db.Boolean, default=False)
+    
+    # Alterado para Inteiro para gerenciar fila de descontos (1 uso por vez)
+    qtd_descontos = db.Column(db.Integer, default=0)
+    
+    # Novos Campos de CRM
+    preferencias = db.Column(db.Text, nullable=True)
+    feedback_texto = db.Column(db.Text, nullable=True)
+    feedback_estrelas = db.Column(db.Integer, default=0)
     
     motos = db.relationship('Moto', backref='dono', lazy=True)
     agendamentos = db.relationship('Agendamento', backref='cliente', lazy=True)
@@ -28,8 +35,9 @@ class Cliente(db.Model):
             'nome': self.nome,
             'telefone': self.telefone,
             'endereco': self.endereco,
-            'tem_desconto': self.saldo_desconto,
-            'indicado_por': self.padrinho.nome if self.padrinho else "Sem indicação"
+            'qtd_descontos': self.qtd_descontos,
+            'indicado_por': self.padrinho.nome if self.padrinho else "Sem indicação",
+            'preferencias': self.preferencias if self.preferencias else ""
         }
 
 # ---------------------------
