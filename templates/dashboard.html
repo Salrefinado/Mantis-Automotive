@@ -23,8 +23,7 @@
     </button>
 </div>
 
-<div class="pb-24"> 
-    {% for data_grupo, lista_agendamentos in agendamentos|groupby('dia_para_agrupamento') %}
+<div class="pb-24"> {% for data_grupo, lista_agendamentos in agendamentos|groupby('dia_para_agrupamento') %}
     
     <div class="mb-4 mt-8 border-b-2 border-slate-200 pb-2 flex items-center">
         <i class="fa-regular fa-calendar text-slate-400 mr-2 text-xl"></i>
@@ -48,12 +47,7 @@
             <div class="p-5">
                 <div class="flex justify-between items-start mb-2">
                     <div>
-                        <h3 class="text-lg font-bold text-slate-900 line-clamp-1 flex items-center gap-2">
-                            {{ agenda.cliente.nome }}
-                            {% if agenda.cliente.preferencias %}
-                                <i class="fa-solid fa-triangle-exclamation text-yellow-500 animate-pulse text-sm" title="Preferências: {{ agenda.cliente.preferencias }}"></i>
-                            {% endif %}
-                        </h3>
+                        <h3 class="text-lg font-bold text-slate-900 line-clamp-1">{{ agenda.cliente.nome }}</h3>
                         <p class="text-slate-500 text-sm font-mono flex items-center gap-1">
                             {{ agenda.moto.modelo }} 
                             <span class="text-xs bg-slate-100 px-1 rounded">{{ agenda.moto.placa }}</span>
@@ -69,14 +63,11 @@
 
                 {% if agenda.status != 'Cancelado' and agenda.status != 'Lavagem Concluída' %}
                 <div class="flex justify-end gap-3 mb-2 text-slate-400 text-sm">
-                    <button onclick="abrirModalEdicao('{{ agenda.id }}', '{{ agenda.data_agendada.strftime('%Y-%m-%d') }}', '{{ agenda.data_agendada.strftime('%H:%M') }}')" class="hover:text-blue-600" title="Editar">
+                    <button onclick="abrirModalEdicao('{{ agenda.id }}', '{{ agenda.data_agendada.strftime('%Y-%m-%d') }}', '{{ agenda.data_agendada.strftime('%H:%M') }}')" class="hover:text-blue-600">
                         <i class="fa-solid fa-pen"></i>
                     </button>
-                    <a href="{{ url_for('cancelar_agendamento', id=agenda.id) }}" onclick="return confirm('Cancelar este agendamento?')" class="hover:text-orange-500" title="Cancelar">
-                        <i class="fa-solid fa-ban"></i>
-                    </a>
-                    <a href="{{ url_for('excluir_agendamento', id=agenda.id) }}" onclick="return confirm('ATENÇÃO: Isso apagará permanentemente o registro. Continuar?')" class="hover:text-red-600" title="Excluir Permanentemente">
-                        <i class="fa-solid fa-trash"></i>
+                    <a href="{{ url_for('cancelar_agendamento', id=agenda.id) }}" onclick="return confirm('Cancelar este agendamento?')" class="hover:text-red-600">
+                        <i class="fa-solid fa-times"></i>
                     </a>
                 </div>
                 {% endif %}
@@ -85,7 +76,7 @@
                 <div class="mt-2 flex gap-2 overflow-x-auto pb-1">
                     {% if agenda.status == 'Agendado' %}
                         <button onclick="abrirModalStatus('{{ agenda.id }}', 'Em Lavagem')" class="flex-1 bg-blue-50 text-blue-700 py-2 px-3 rounded text-center text-sm font-semibold hover:bg-blue-100 border border-blue-200 whitespace-nowrap">
-                            <i class="fa-solid fa-soap mr-1"></i> Iniciar
+                            <i class="fa-solid fa-soap mr-1"></i> Iniciar Lavagem
                         </button>
                     {% elif agenda.status == 'Em Lavagem' %}
                         <button onclick="abrirModalStatus('{{ agenda.id }}', 'Lavagem Concluída')" class="flex-1 bg-green-50 text-green-700 py-2 px-3 rounded text-center text-sm font-semibold hover:bg-green-100 border border-green-200 whitespace-nowrap">
@@ -120,35 +111,17 @@
             </div>
             
             <form action="{{ url_for('novo_agendamento') }}" method="POST" id="formAgendamento">
-                
-                <div id="boxPreferencias" class="hidden bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4 rounded text-sm text-yellow-800">
-                    <p class="font-bold"><i class="fa-solid fa-circle-exclamation mr-1"></i> Preferências do Cliente:</p>
-                    <p id="txtPreferencias"></p>
-                </div>
-
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
                     <div class="flex gap-2">
                         <div class="flex-1"><select id="selectCliente" name="cliente_id" class="w-full border rounded p-2 select2-busca" required><option value=""></option></select></div>
-                        <button type="button" onclick="alternarCadastroCliente()" class="bg-blue-600 text-white px-3 rounded hover:bg-blue-700 shadow" title="Novo Cliente"><i class="fa-solid fa-user-plus"></i></button>
+                        <button type="button" onclick="alternarCadastroCliente()" class="bg-blue-600 text-white px-3 rounded hover:bg-blue-700 shadow"><i class="fa-solid fa-user-plus"></i></button>
                     </div>
                 </div>
 
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Veículo</label>
                     <select name="moto_id" id="selectMoto" class="w-full border p-2 rounded-lg bg-slate-50 border-gray-300 h-[42px]" required><option value="">Selecione o Cliente primeiro</option></select>
-                    
-                    <div id="boxNovaMotoExistente" class="hidden mt-3 p-3 bg-gray-100 rounded border border-gray-300">
-                        <p class="text-xs font-bold text-gray-500 uppercase mb-2">Adicionar Moto para este Cliente</p>
-                        <div class="grid grid-cols-2 gap-2 mb-2">
-                            <input type="text" id="newMotoModelo" placeholder="Modelo" class="border p-2 rounded text-sm">
-                            <select id="newMotoCategoria" class="border p-2 rounded text-sm bg-white">
-                                <option value="Naked">Naked</option><option value="Sport">Sport</option><option value="Custom">Custom</option><option value="BigTrail">Big Trail</option>
-                            </select>
-                        </div>
-                        <input type="text" id="newMotoPlaca" placeholder="Placa" class="border p-2 rounded text-sm w-full mb-2">
-                        <button type="button" onclick="salvarMotoExtra()" class="w-full bg-slate-800 text-white text-xs font-bold py-2 rounded">Salvar Veículo</button>
-                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 mb-4">
@@ -168,40 +141,28 @@
                     <input type="number" step="0.01" id="inputValor" name="valor" class="w-full border p-2 rounded font-bold" placeholder="Valor R$" required>
                 </div>
 
-                <div class="mb-4 bg-blue-50 p-2 rounded border border-blue-100">
-                    <label class="text-xs font-bold text-blue-800 uppercase">Indicação (Opcional)</label>
-                    <select name="quem_indicou_id" class="w-full border rounded p-1 select2-busca">
-                        <option value="">Quem indicou este serviço?</option>
-                        {% for c in clientes_todos %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
-                    </select>
-                </div>
-
                 <button type="submit" class="w-full bg-slate-900 text-white font-bold py-3 rounded-lg hover:bg-black transition shadow-lg">Confirmar Agendamento</button>
             </form>
 
             <form id="formCadastroRapido" class="hidden mt-4 border-t pt-4">
                 <h4 class="font-bold text-slate-800 mb-3 flex items-center"><i class="fa-solid fa-bolt text-yellow-500 mr-2"></i> Cadastro Rápido</h4>
-                
                 <input type="text" name="nome" placeholder="Nome Completo" class="w-full border p-2 rounded mb-2" required>
                 <input type="text" name="telefone" placeholder="WhatsApp" class="w-full border p-2 rounded mb-2" required>
                 <input type="text" name="endereco" placeholder="Endereço (Opcional)" class="w-full border p-2 rounded mb-2">
-                <input type="text" name="preferencias" placeholder="Preferências (Ex: Cuidado com adesivos)" class="w-full border p-2 rounded mb-2 bg-yellow-50 border-yellow-200">
-
-                <div id="listaMotosCadastro">
-                    <div class="moto-item mb-3 p-2 bg-gray-50 rounded border">
-                        <label class="text-xs font-bold text-gray-500">Veículo Principal</label>
-                        <div class="grid grid-cols-2 gap-2 mb-2">
-                            <input type="text" name="modelo_moto" placeholder="Modelo" class="border p-2 rounded text-sm" required>
-                            <select name="categoria_moto" class="border p-2 rounded bg-white text-sm">
-                                <option value="Naked">Naked</option><option value="Sport">Sport</option><option value="Custom">Custom</option><option value="BigTrail">Big Trail</option>
-                            </select>
-                        </div>
-                        <input type="text" name="placa_moto" placeholder="Placa" class="w-full border p-2 rounded text-sm">
-                    </div>
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <input type="text" name="modelo_moto" placeholder="Modelo Moto" class="border p-2 rounded" required>
+                    <select name="categoria_moto" class="border p-2 rounded bg-white">
+                        <option value="Naked">Naked</option><option value="Sport">Sport</option><option value="Custom">Custom</option><option value="BigTrail">Big Trail</option>
+                    </select>
                 </div>
-                
-                <button type="button" onclick="addCampoMotoCadastro()" class="text-blue-600 text-sm font-bold mb-4 hover:underline"><i class="fa-solid fa-plus-circle"></i> Adicionar outra moto</button>
-
+                <input type="text" name="placa_moto" placeholder="Placa (Opcional)" class="w-full border p-2 rounded mb-3">
+                <div class="mb-3 bg-blue-50 p-2 rounded border border-blue-100">
+                    <label class="text-xs font-bold text-blue-800 uppercase">Indicação</label>
+                    <select name="quem_indicou_id" class="w-full border rounded p-1 select2-busca">
+                        <option value="">Quem indicou?</option>
+                        {% for c in clientes_todos %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
+                    </select>
+                </div>
                 <div class="flex gap-2">
                     <button type="button" onclick="alternarCadastroCliente()" class="w-1/3 bg-gray-200 text-gray-700 py-2 rounded">Cancelar</button>
                     <button type="submit" class="w-2/3 bg-green-600 text-white py-2 rounded hover:bg-green-700 font-bold">Salvar Cliente</button>
@@ -329,158 +290,55 @@
         else inputValor.value = ''; 
     }
     
-    // Função para adicionar campos de moto no Cadastro Rápido
-    function addCampoMotoCadastro() {
-        const html = `
-            <div class="moto-item-extra mb-3 p-2 bg-yellow-50 rounded border border-yellow-200 relative">
-                <button type="button" onclick="this.parentElement.remove()" class="absolute top-1 right-2 text-red-500 text-xs font-bold">X</button>
-                <label class="text-xs font-bold text-gray-500">Moto Adicional</label>
-                <div class="grid grid-cols-2 gap-2 mb-2">
-                    <input type="text" class="extra-modelo border p-2 rounded text-sm" placeholder="Modelo" required>
-                    <select class="extra-categoria border p-2 rounded bg-white text-sm">
-                        <option value="Naked">Naked</option><option value="Sport">Sport</option><option value="Custom">Custom</option><option value="BigTrail">Big Trail</option>
-                    </select>
-                </div>
-                <input type="text" class="extra-placa w-full border p-2 rounded text-sm" placeholder="Placa">
-            </div>
-        `;
-        $('#listaMotosCadastro').append(html);
-    }
-
-    // Função para salvar moto extra no select de agendamento
-    function salvarMotoExtra() {
-        const clienteId = $('#selectCliente').val();
-        const modelo = $('#newMotoModelo').val();
-        const categoria = $('#newMotoCategoria').val();
-        const placa = $('#newMotoPlaca').val();
-
-        if(!modelo) { alert('Digite o modelo da moto!'); return; }
-
-        $.post('/api/cadastrar_moto', { cliente_id: clienteId, modelo: modelo, categoria: categoria, placa: placa }, function(response) {
-            if(response.success) {
-                // Adiciona a nova moto ao select e seleciona ela
-                const selectMoto = $('#selectMoto');
-                // Remove a opção "Nova Moto" temporariamente
-                selectMoto.find('option[value="new"]').remove();
-                
-                const option = new Option(response.moto.modelo + ' (' + response.moto.categoria + ')', response.moto.id, true, true);
-                option.dataset.categoria = response.moto.categoria;
-                selectMoto.append(option);
-                
-                // Readiciona a opção Nova Moto no final
-                selectMoto.append(new Option("+ Nova Moto...", "new"));
-                
-                selectMoto.trigger('change');
-                $('#boxNovaMotoExistente').addClass('hidden');
-                $('#newMotoModelo').val(''); $('#newMotoPlaca').val('');
-            } else {
-                alert('Erro ao salvar moto');
-            }
-        });
-    }
-    
     $(document).ready(function() {
-        $('.select2-busca').select2({ width: '100%', minimumInputLength: 1 });
-        
-        var selectCliente = $('#selectCliente').select2({ 
-            placeholder: "Digite Nome ou Telefone...", 
-            minimumInputLength: 1,
-            ajax: { 
-                url: '/api/buscar_cliente', 
-                dataType: 'json', 
-                delay: 250, 
-                processResults: function (data) { return { results: data }; }, 
-                cache: true 
-            } 
-        });
+        $('.select2-busca').select2({ width: '100%' });
+        var selectCliente = $('#selectCliente').select2({ placeholder: "Busque por Nome", ajax: { url: '/api/buscar_cliente', dataType: 'json', delay: 250, processResults: function (data) { return { results: data }; }, cache: true } });
         
         $('#selectCliente').on('select2:select', function (e) {
-            var data = e.params.data; 
-            var selectMoto = $('#selectMoto'); 
-            selectMoto.empty();
-            
-            // Lógica de Preferências
-            if (data.preferencias) {
-                $('#boxPreferencias').removeClass('hidden');
-                $('#txtPreferencias').text(data.preferencias);
-            } else {
-                $('#boxPreferencias').addClass('hidden');
-            }
-
+            var data = e.params.data; var selectMoto = $('#selectMoto'); selectMoto.empty();
             if (data.motos && data.motos.length > 0) { 
                 data.motos.forEach(function(moto) { 
                     var option = new Option(moto.modelo + ' (' + moto.categoria + ')', moto.id); 
                     option.dataset.categoria = moto.categoria; 
                     selectMoto.append(option); 
                 }); 
-            } else {
-                selectMoto.append(new Option("Nenhuma moto cadastrada", ""));
-            }
-            // Opção para adicionar nova moto
-            selectMoto.append(new Option("+ Nova Moto...", "new"));
-            
-            selectMoto.trigger('change');
+                selectMoto.trigger('change'); 
+            } else selectMoto.append(new Option("Nenhuma moto cadastrada", ""));
             if(data.tem_desconto) alert("✨ Cliente VIP: 10% de desconto!");
         });
 
         $('#selectMoto').on('change', function() {
-            var val = $(this).val();
-            if (val === 'new') {
-                $('#boxNovaMotoExistente').removeClass('hidden');
-                document.getElementById('selectServico').innerHTML = '<option value="manual">Manual / Outro</option>';
-            } else {
-                $('#boxNovaMotoExistente').addClass('hidden');
-                var categoria = $(this).find(':selected').data('categoria') || 'Naked'; 
-                var selectServico = document.getElementById('selectServico'); 
-                selectServico.innerHTML = '<option value="manual">Manual / Outro</option>';
-                var opcoes = TABELA_PRECOS[categoria];
-                if (opcoes) {
-                    opcoes.forEach(servico => { 
-                        var opt = document.createElement('option'); 
-                        opt.value = servico.nome; 
-                        opt.text = servico.nome + ' - R$ ' + servico.valor; 
-                        opt.dataset.valor = servico.valor; 
-                        selectServico.add(opt); 
-                    });
-                    if(selectServico.options.length > 1) { selectServico.selectedIndex = 1; atualizarPreco(); }
-                }
+            var categoria = $(this).find(':selected').data('categoria') || 'Naked'; 
+            var selectServico = document.getElementById('selectServico'); 
+            selectServico.innerHTML = '<option value="manual">Manual / Outro</option>';
+            var opcoes = TABELA_PRECOS[categoria];
+            if (opcoes) {
+                opcoes.forEach(servico => { 
+                    var opt = document.createElement('option'); 
+                    opt.value = servico.nome; 
+                    opt.text = servico.nome + ' - R$ ' + servico.valor; 
+                    opt.dataset.valor = servico.valor; 
+                    selectServico.add(opt); 
+                });
+                if(selectServico.options.length > 1) { selectServico.selectedIndex = 1; atualizarPreco(); }
             }
         });
 
         $('#formCadastroRapido').on('submit', function(e) {
             e.preventDefault();
             var formData = new FormData(this);
-            
             $.ajax({
                 url: '/cadastrar_cliente', type: 'POST', data: formData, processData: false, contentType: false,
                 success: function(response) {
                     if(response.success) {
-                        const clienteId = response.cliente.id;
-                        
-                        // Processar Motos Extras
-                        const extras = document.querySelectorAll('.moto-item-extra');
-                        let promessas = [];
-                        
-                        extras.forEach(div => {
-                            const modelo = div.querySelector('.extra-modelo').value;
-                            const categoria = div.querySelector('.extra-categoria').value;
-                            const placa = div.querySelector('.extra-placa').value;
-                            if(modelo) {
-                                promessas.push($.post('/api/cadastrar_moto', { cliente_id: clienteId, modelo: modelo, categoria: categoria, placa: placa }));
-                            }
-                        });
-
-                        Promise.all(promessas).then(() => {
-                            // Após salvar tudo, atualiza a tela
-                            var newOption = new Option(response.cliente.nome + ' - ' + response.cliente.telefone, clienteId, true, true);
-                            $('#selectCliente').append(newOption).trigger('change');
-                            // Trigger change vai puxar do backend, mas pode ter delay, vamos forçar refresh visual
-                            // O melhor é simular a seleção novamente ou deixar o usuário ver
-                            alternarCadastroCliente();
-                            $('#formCadastroRapido')[0].reset();
-                            $('#listaMotosCadastro .moto-item-extra').remove();
-                            alert("Cliente e veículos cadastrados!");
-                        });
+                        var newOption = new Option(response.cliente.nome + ' - ' + response.cliente.telefone, response.cliente.id, true, true);
+                        $('#selectCliente').append(newOption).trigger('change');
+                        var selectMoto = $('#selectMoto'); selectMoto.empty();
+                        var motoOption = new Option(response.moto.modelo + ' (' + response.moto.categoria + ')', response.moto.id, true, true);
+                        motoOption.dataset.categoria = response.moto.categoria;
+                        selectMoto.append(motoOption).trigger('change');
+                        alternarCadastroCliente();
+                        $('#formCadastroRapido')[0].reset();
                     }
                 }
             });
