@@ -213,7 +213,8 @@ def excluir_agendamento(id):
         a = Agendamento.query.get(id)
         if a:
             # CORREÇÃO: Se excluir um agendamento válido com desconto, devolve o crédito.
-            if a.status != 'Cancelado' and a.desconto_aplicado:
+            # MAS se o serviço já foi concluído, o desconto foi utilizado, portanto NÃO devolve.
+            if a.status != 'Cancelado' and a.status != 'Lavagem Concluída' and a.desconto_aplicado:
                 a.cliente.qtd_descontos += 1
 
             for midia in a.midias:
@@ -301,6 +302,39 @@ def adicionar_moto():
         return jsonify({'success': True, 'moto': nova_moto.to_dict()})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/salvar_moto_cliente', methods=['POST'])
+def salvar_moto_cliente():
+    """Rota unificada para adicionar ou editar motos na tela de Clientes."""
+    try:
+        moto_id = request.form.get('moto_id')
+        cliente_id = request.form.get('cliente_id')
+        
+        # Se tem ID, é edição
+        if moto_id:
+            moto = Moto.query.get(moto_id)
+            if moto:
+                moto.modelo = request.form.get('modelo')
+                moto.placa = request.form.get('placa')
+                moto.categoria = request.form.get('categoria')
+                db.session.commit()
+                flash('Veículo atualizado com sucesso!', 'success')
+        # Se não tem ID, é criação
+        elif cliente_id:
+            nova_moto = Moto(
+                cliente_id=cliente_id,
+                modelo=request.form.get('modelo'),
+                placa=request.form.get('placa'),
+                categoria=request.form.get('categoria')
+            )
+            db.session.add(nova_moto)
+            db.session.commit()
+            flash('Novo veículo adicionado!', 'success')
+            
+    except Exception as e:
+        flash(f'Erro ao salvar veículo: {e}', 'error')
+    
+    return redirect(url_for('listar_clientes'))
 
 @app.route('/editar_cliente_dados', methods=['POST'])
 def editar_cliente_dados():
