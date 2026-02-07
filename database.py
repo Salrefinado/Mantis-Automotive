@@ -18,9 +18,6 @@ class Cliente(db.Model):
     indicado_por_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
     saldo_desconto = db.Column(db.Boolean, default=False)
     
-    # Novo campo para preferências (ex: "Não usar silicone no painel")
-    preferencias = db.Column(db.String(500), nullable=True)
-    
     motos = db.relationship('Moto', backref='dono', lazy=True)
     agendamentos = db.relationship('Agendamento', backref='cliente', lazy=True)
     indicacoes = db.relationship('Cliente', backref=db.backref('padrinho', remote_side=[id]), lazy=True)
@@ -32,7 +29,6 @@ class Cliente(db.Model):
             'telefone': self.telefone,
             'endereco': self.endereco,
             'tem_desconto': self.saldo_desconto,
-            'preferencias': self.preferencias,
             'indicado_por': self.padrinho.nome if self.padrinho else "Sem indicação"
         }
 
@@ -116,10 +112,6 @@ class Agendamento(db.Model):
     custo_total_produtos = db.Column(db.Float, default=0.0)
     gastos_extras = db.Column(db.Float, default=0.0)
     
-    # Novos campos para Feedback do Serviço
-    feedback_estrelas = db.Column(db.Integer, nullable=True) # 1 a 5
-    feedback_texto = db.Column(db.String(500), nullable=True)
-
     midias = db.relationship('MidiaAgendamento', backref='agendamento', lazy=True)
 
     @property
