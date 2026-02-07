@@ -50,14 +50,6 @@
                     <div>
                         <div class="flex items-center gap-2">
                             <h3 class="text-lg font-bold text-slate-900 line-clamp-1">{{ agenda.cliente.nome }}</h3>
-                            {% if agenda.cliente.preferencias %}
-                                <div class="relative group/tooltip">
-                                    <i class="fa-solid fa-triangle-exclamation text-yellow-500 cursor-help"></i>
-                                    <div class="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block w-48 p-2 bg-black text-white text-xs rounded shadow-lg z-10">
-                                        {{ agenda.cliente.preferencias }}
-                                    </div>
-                                </div>
-                            {% endif %}
                         </div>
                         <p class="text-slate-500 text-sm font-mono flex items-center gap-1">
                             {{ agenda.moto.modelo }} 
@@ -96,7 +88,8 @@
                 {% if agenda.status != 'Cancelado' %}
                 <div class="mt-2 flex gap-2 overflow-x-auto pb-1">
                     {% if agenda.status == 'Agendado' %}
-                        <button onclick="abrirModalStatus('{{ agenda.id }}', 'Em Lavagem')" class="flex-1 bg-blue-50 text-blue-700 py-2 px-3 rounded text-center text-sm font-semibold hover:bg-blue-100 border border-blue-200 whitespace-nowrap transition">
+                        <button onclick="abrirModalStatus('{{ agenda.id }}', 'Em Lavagem', `{{ agenda.cliente.preferencias|replace('\n', ' ')|replace('`', '') if agenda.cliente.preferencias else '' }}`)" 
+                                class="flex-1 bg-blue-50 text-blue-700 py-2 px-3 rounded text-center text-sm font-semibold hover:bg-blue-100 border border-blue-200 whitespace-nowrap transition">
                             <i class="fa-solid fa-soap mr-1"></i> Iniciar
                         </button>
                     {% elif agenda.status == 'Em Lavagem' %}
@@ -261,7 +254,11 @@
 <div id="modalStatusTempo" class="fixed inset-0 bg-gray-900 bg-opacity-70 hidden z-[60] flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 border-t-4 border-blue-600">
         <h3 id="statusTitulo" class="text-xl font-bold text-slate-800 mb-1">Atualizar Status</h3>
-        <p class="text-sm text-slate-500 mb-6">Confirme o horário da ação.</p>
+        
+        <div id="avisoPreferencias" class="hidden mt-4 mb-2 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-3 rounded text-sm shadow-sm animate-pulse">
+            </div>
+
+        <p class="text-sm text-slate-500 mb-6 mt-2">Confirme o horário da ação.</p>
         
         <form id="formAtualizarStatus" method="POST" action="">
             <div class="mb-6">
@@ -375,14 +372,24 @@
         });
     });
 
-    function abrirModalStatus(id, status) {
+    // Função atualizada para receber e exibir preferências
+    function abrirModalStatus(id, status, preferencias = '') {
         const modal = document.getElementById('modalStatusTempo');
         const form = document.getElementById('formAtualizarStatus');
         const titulo = document.getElementById('statusTitulo');
+        const avisoDiv = document.getElementById('avisoPreferencias');
         
-        // Agora usamos o status passado diretamente (o backend trata se vier com %)
         form.action = "/atualizar_status/" + id + "/" + status;
         
+        // Lógica para exibir aviso de preferências
+        if (status === 'Em Lavagem' && preferencias && preferencias.trim() !== '') {
+            avisoDiv.innerHTML = '<p class="font-bold mb-1"><i class="fa-solid fa-triangle-exclamation"></i> ATENÇÃO ÀS PREFERÊNCIAS:</p><p class="italic">"' + preferencias + '"</p>';
+            avisoDiv.classList.remove('hidden');
+        } else {
+            avisoDiv.classList.add('hidden');
+            avisoDiv.innerHTML = '';
+        }
+
         if (status === 'Em Lavagem') {
             titulo.innerText = 'Iniciar Lavagem';
         } else if (status === 'Lavagem Concluída') {
@@ -462,11 +469,8 @@
                 selectMoto.append(new Option("Nenhuma moto cadastrada", ""));
             }
 
-            // Alerta de Preferências
-            if(data.preferencias) {
-                alert("⚠️ NOTA DO CLIENTE: " + data.preferencias);
-            }
-
+            // Nota: O alerta de preferências via alert() foi removido pois agora aparece no modal de iniciar lavagem
+            
             // Alerta de Desconto
             if(data.qtd_descontos > 0) {
                 alert(`✨ CLIENTE VIP: Possui ${data.qtd_descontos} desconto(s) disponível(is)! 10% será aplicado.`);
