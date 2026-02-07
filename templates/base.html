@@ -109,8 +109,7 @@
 
     <script>
         $(document).ready(function() {
-            // Inicialização genérica para selects simples que usem a classe .select2-busca
-            // (Modais específicos como Agendamento usam scripts próprios no template filho)
+            // Inicialização genérica para selects simples
             $('.select2-busca').select2({
                 width: '100%',
                 placeholder: "Pesquisar...",
@@ -118,6 +117,23 @@
                 language: {
                     noResults: function() { return "Sem resultados"; },
                     searching: function() { return "A pesquisar..."; }
+                }
+            });
+
+            // === VALIDAÇÃO GLOBAL DE UPLOAD ===
+            // Previne envio de arquivos > 4.5MB em qualquer formulário (Dashboard ou Clientes)
+            // Isso corrige o erro 413 (Payload Too Large) da Vercel/Nginx
+            $('form').on('submit', function(e) {
+                if ($(this).attr('enctype') === 'multipart/form-data') {
+                    var fileInput = $(this).find('input[type="file"]');
+                    if (fileInput.length > 0 && fileInput[0].files.length > 0) {
+                        var fileSizeMB = fileInput[0].files[0].size / 1024 / 1024;
+                        if (fileSizeMB > 4.5) {
+                            e.preventDefault();
+                            alert('⚠️ ARQUIVO MUITO GRANDE!\n\nO limite para upload é de 4.5MB.\nSeu arquivo tem ' + fileSizeMB.toFixed(2) + 'MB.\n\nPor favor, envie um arquivo menor ou reduza a qualidade.');
+                            return false;
+                        }
+                    }
                 }
             });
         });
