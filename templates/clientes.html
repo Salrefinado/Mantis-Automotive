@@ -62,7 +62,12 @@
                         </div>
                         
                         <script type="application/json" id="motos-data-{{ c.dados.id }}">
-                            {{ c.motos|map(attribute='to_dict')|list|tojson }}
+                            [
+                            {% for m in c.motos %}
+                                {{ m.to_dict() | tojson }}
+                                {% if not loop.last %},{% endif %}
+                            {% endfor %}
+                            ]
                         </script>
                     </td>
 
