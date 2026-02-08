@@ -18,7 +18,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chave-secreta-trocar-em
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url if database_url else 'sqlite:///lavagem.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
-# Aumenta o limite de upload do Flask para 64MB (ajuda a evitar 413 no lado do Python)
+# Aumenta o limite de upload do Flask para 64MB
 app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024 
 
 db.init_app(app)
@@ -27,28 +27,33 @@ db.init_app(app)
 def verificar_migracoes_banco():
     """
     Verifica se as novas colunas existem no banco de dados.
-    Se não existirem, cria-as automaticamente para evitar Erro 500.
+    Se não existirem, cria-as automaticamente.
     """
     with app.app_context():
         try:
             with db.engine.connect() as conn:
-                # Lista de colunas para verificar/adicionar na tabela CLIENTES
+                # 1. Migrações de CLIENTES
                 colunas_clientes = [
                     ("qtd_descontos", "INTEGER DEFAULT 0"),
                     ("preferencias", "TEXT"),
                     ("feedback_texto", "TEXT"),
                     ("feedback_estrelas", "INTEGER DEFAULT 0"),
-                    ("indicado_por_id", "INTEGER") # <--- ADICIONADO PARA CORRIGIR O ERRO 500
+                    ("indicado_por_id", "INTEGER")
                 ]
-                
                 for col, tipo in colunas_clientes:
                     try:
-                        # Tenta adicionar a coluna. Se já existir, o banco retornará erro, que ignoramos.
                         conn.execute(text(f"ALTER TABLE clientes ADD COLUMN {col} {tipo}"))
                         conn.commit()
-                        print(f"--- Migração: Coluna '{col}' adicionada em Clientes. ---")
                     except Exception:
-                        conn.rollback() # Coluna provavelmente já existe
+                        conn.rollback()
+
+                # 2. Migrações de PRODUTOS (Novo Campo Link)
+                try:
+                    conn.execute(text("ALTER TABLE produtos ADD COLUMN link_compra TEXT"))
+                    conn.commit()
+                    print("--- Migração: Coluna 'link_compra' adicionada em Produtos. ---")
+                except Exception:
+                    conn.rollback()
                         
         except Exception as e:
             print(f"Erro ao verificar migrações: {e}")
@@ -68,10 +73,56 @@ def inicializar_servicos_padrao():
     except Exception as e:
         print(f"Erro ao inicializar serviços: {e}")
 
+def inicializar_produtos_padrao():
+    """
+    Cadastra os produtos iniciais com estoque zerado e valor zerado
+    apenas se a tabela estiver vazia.
+    """
+    try:
+        if Produto.query.first() is None:
+            # Lista fornecida: Nome, Unidade, Gasto Médio
+            # Custo e Estoque iniciam Zerados (0.0)
+            produtos_iniciais = [
+                ("V-Floc (Shampoo)", "ml", 10.0),
+                ("Vexus (Rodas/Motor)", "ml", 100.0),
+                ("Izer (Descont. Ferroso)", "ml", 40.0),
+                ("H-7 (Desengraxante)", "ml", 150.0),
+                ("Shiny (Pneu/Brilho)", "ml", 20.0),
+                ("Hidracouro (Bancos)", "ml", 15.0),
+                ("Prizm (Vidros/Metais)", "ml", 10.0),
+                ("Glazy (Viseira)", "ml", 15.0),
+                ("Restaurax (Plásticos Ext)", "ml", 20.0),
+                ("Intense (Plásticos Int)", "ml", 20.0),
+                ("Sanitizante (Estofados)", "ml", 30.0),
+                ("V-Lub (Borrachas)", "ml", 10.0),
+                ("Blend Spray (Cera/Brilho)", "ml", 15.0),
+                ("Lub. Corrente (Spray)", "ml", 15.0),
+                ("Graxa Branca/Lítio", "g", 300.0)
+            ]
+            
+            for nome, un, gasto in produtos_iniciais:
+                novo = Produto(
+                    nome=nome,
+                    unidade_medida=un,
+                    estoque_atual=0.0,
+                    custo_compra=0.0,
+                    quantidade_compra=0.0, # Evita divisão por zero na view, mas valor é 0
+                    gasto_medio_lavagem=gasto,
+                    ponto_pedido=5.0, # Alerta padrão
+                    link_compra=""
+                )
+                db.session.add(novo)
+            
+            db.session.commit()
+            print("--- Produtos Iniciais Cadastrados (Zerados) ---")
+    except Exception as e:
+        print(f"Erro ao inicializar produtos: {e}")
+
 with app.app_context():
     db.create_all()
-    verificar_migracoes_banco() # <--- Executa a correção do banco ao iniciar
+    verificar_migracoes_banco()
     inicializar_servicos_padrao()
+    inicializar_produtos_padrao() # <--- Executa a carga inicial dos produtos
 
 try:
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -159,13 +210,10 @@ def novo_agendamento():
         cliente = Cliente.query.get(cliente_id)
         aplicar_desconto = False
         
-        # Lógica de Desconto (Pilha de Descontos)
-        # O desconto é consumido na reserva para garantir que o cliente não use o mesmo crédito em 2 agendamentos simultâneos.
-        # SE O AGENDAMENTO FOR CANCELADO, O CRÉDITO É DEVOLVIDO (ver rota cancelar_agendamento).
         if cliente.qtd_descontos > 0:
             valor = valor * 0.90 # 10% de desconto
             aplicar_desconto = True
-            cliente.qtd_descontos -= 1 # Consome um desconto (será devolvido se cancelar)
+            cliente.qtd_descontos -= 1 
         
         novo_agendamento = Agendamento(
             cliente_id=cliente_id, moto_id=moto_id, data_agendada=data_agendada,
@@ -199,7 +247,6 @@ def editar_agendamento():
 def cancelar_agendamento(id):
     a = Agendamento.query.get(id)
     if a:
-        # CORREÇÃO: Se o agendamento tinha desconto e não foi concluído, devolve o crédito ao cliente.
         if a.status != 'Cancelado' and a.desconto_aplicado:
             a.cliente.qtd_descontos += 1
             
@@ -213,8 +260,6 @@ def excluir_agendamento(id):
     try:
         a = Agendamento.query.get(id)
         if a:
-            # CORREÇÃO: Se excluir um agendamento válido com desconto, devolve o crédito.
-            # MAS se o serviço já foi concluído, o desconto foi utilizado, portanto NÃO devolve.
             if a.status != 'Cancelado' and a.status != 'Lavagem Concluída' and a.desconto_aplicado:
                 a.cliente.qtd_descontos += 1
 
@@ -306,12 +351,10 @@ def adicionar_moto():
 
 @app.route('/salvar_moto_cliente', methods=['POST'])
 def salvar_moto_cliente():
-    """Rota unificada para adicionar ou editar motos na tela de Clientes."""
     try:
         moto_id = request.form.get('moto_id')
         cliente_id = request.form.get('cliente_id')
         
-        # Se tem ID, é edição
         if moto_id:
             moto = Moto.query.get(moto_id)
             if moto:
@@ -320,7 +363,6 @@ def salvar_moto_cliente():
                 moto.categoria = request.form.get('categoria')
                 db.session.commit()
                 flash('Veículo atualizado com sucesso!', 'success')
-        # Se não tem ID, é criação
         elif cliente_id:
             nova_moto = Moto(
                 cliente_id=cliente_id,
@@ -370,10 +412,9 @@ def salvar_feedback():
         flash('Erro ao salvar feedback', 'error')
     return redirect(url_for('listar_clientes'))
 
-# --- STATUS LAVAGEM (CORREÇÃO DO BUG %20) ---
 @app.route('/atualizar_status/<int:id>/<status>', methods=['POST'])
 def atualizar_status(id, status):
-    status = unquote(status) # Decodifica URL (Em%20Lavagem -> Em Lavagem)
+    status = unquote(status)
     
     a = Agendamento.query.get(id)
     horario_str = request.form.get('horario')
@@ -419,23 +460,62 @@ def upload_midia(agendamento_id):
     if 'arquivo' not in request.files: return 'Erro', 400
     arquivo = request.files['arquivo']
     if arquivo:
-        # A validação de tamanho real deve ser feita no Frontend para evitar erro 413 do Nginx/Vercel
         filename = secure_filename(f"{agendamento_id}_{datetime.now().timestamp()}_{arquivo.filename}")
         arquivo.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         db.session.add(MidiaAgendamento(agendamento_id=agendamento_id, caminho_arquivo=filename, tipo=request.form.get('tipo')))
         db.session.commit()
     return redirect(request.referrer or url_for('dashboard'))
 
+# --- GESTÃO DE PRODUTOS ---
 @app.route('/produtos', methods=['GET', 'POST'])
 def gerenciar_produtos():
     if request.method == 'POST':
+        # Criação de novo produto
         db.session.add(Produto(
-            nome=request.form.get('nome'), unidade_medida=request.form.get('unidade'),
-            custo_compra=float(request.form.get('custo')), quantidade_compra=float(request.form.get('qtd_compra')),
-            gasto_medio_lavagem=float(request.form.get('gasto_medio')), estoque_atual=float(request.form.get('estoque_inicial'))
+            nome=request.form.get('nome'), 
+            unidade_medida=request.form.get('unidade'),
+            custo_compra=float(request.form.get('custo')), 
+            quantidade_compra=float(request.form.get('qtd_compra')),
+            gasto_medio_lavagem=float(request.form.get('gasto_medio')), 
+            estoque_atual=float(request.form.get('estoque_inicial')),
+            link_compra=request.form.get('link_compra') # Salva o link
         ))
         db.session.commit()
+        flash('Produto cadastrado com sucesso!', 'success')
+        
     return render_template('produtos.html', produtos=Produto.query.all())
+
+@app.route('/editar_produto', methods=['POST'])
+def editar_produto():
+    try:
+        id_ = request.form.get('produto_id')
+        prod = Produto.query.get(id_)
+        if prod:
+            prod.nome = request.form.get('nome')
+            prod.unidade_medida = request.form.get('unidade_medida')
+            prod.estoque_atual = float(request.form.get('estoque_atual'))
+            prod.custo_compra = float(request.form.get('custo_compra'))
+            prod.quantidade_compra = float(request.form.get('quantidade_compra'))
+            prod.gasto_medio_lavagem = float(request.form.get('gasto_medio_lavagem'))
+            prod.link_compra = request.form.get('link_compra')
+            
+            db.session.commit()
+            flash('Produto atualizado com sucesso!', 'success')
+    except Exception as e:
+        flash(f'Erro ao editar produto: {e}', 'error')
+    return redirect(url_for('gerenciar_produtos'))
+
+@app.route('/excluir_produto/<int:id>')
+def excluir_produto(id):
+    try:
+        prod = Produto.query.get(id)
+        if prod:
+            db.session.delete(prod)
+            db.session.commit()
+            flash('Produto excluído.', 'success')
+    except Exception as e:
+        flash(f'Erro ao excluir: {e}', 'error')
+    return redirect(url_for('gerenciar_produtos'))
 
 @app.route('/clientes')
 def listar_clientes():
@@ -443,7 +523,6 @@ def listar_clientes():
     clientes_processados = []
     
     for c in clientes_brutos:
-        # Pega agendamentos ordenados do mais recente para o antigo para facilitar upload
         agendamentos_recentes = sorted(c.agendamentos, key=lambda x: x.data_agendada, reverse=True)
         lavagens_concluidas = [a for a in c.agendamentos if a.status == 'Lavagem Concluída']
         lavagens_canceladas = [a for a in c.agendamentos if a.status == 'Cancelado']
@@ -451,7 +530,7 @@ def listar_clientes():
         clientes_processados.append({
             'dados': c, 
             'motos': c.motos,
-            'agendamentos': agendamentos_recentes, # Necessário para o modal de upload
+            'agendamentos': agendamentos_recentes, 
             'qtd_lavagens': len(lavagens_concluidas),
             'qtd_canceladas': len(lavagens_canceladas),
             'total_gasto': sum(a.valor_cobrado for a in lavagens_concluidas),
