@@ -2,97 +2,109 @@
 
 {% block content %}
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    
-    <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-blue-600 h-fit">
-        <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center">
-            <i class="fa-solid fa-bottle-droplet mr-2 text-blue-600"></i> Novo Produto
-        </h2>
-        
-        <form method="POST" action="{{ url_for('gerenciar_produtos') }}">
-            <div class="mb-4">
+<div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+    <h2 class="text-3xl font-bold text-slate-800 flex items-center">
+        <i class="fa-solid fa-boxes-stacked mr-3 text-blue-600"></i> Controle de Estoque
+    </h2>
+    <button onclick="toggleNovoProduto()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-lg hover:scale-105 transition flex items-center">
+        <i class="fa-solid fa-plus-circle mr-2"></i> Cadastrar Novo Produto
+    </button>
+</div>
+
+<div id="formNovoProduto" class="hidden bg-white p-6 rounded-xl shadow-lg border-t-4 border-blue-600 mb-8 animate-fade-in-down">
+    <h3 class="text-lg font-bold text-slate-700 mb-4 border-b pb-2">Cadastro de Insumo</h3>
+    <form method="POST" action="{{ url_for('gerenciar_produtos') }}">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
                 <label class="block text-sm font-bold text-slate-700 mb-1">Nome do Produto</label>
                 <input type="text" name="nome" placeholder="Ex: Cera Líquida Premium" class="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" required>
             </div>
-
-            <div class="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase">Unidade</label>
-                    <select name="unidade" class="w-full border p-2 rounded bg-slate-50">
-                        <option value="ml">Mililitros (ml)</option>
-                        <option value="g">Gramas (g)</option>
-                        <option value="un">Unidade (un)</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase">Estoque Inicial</label>
-                    <input type="number" step="0.1" name="estoque_inicial" placeholder="Qtd atual" class="w-full border p-2 rounded" required>
-                </div>
+            <div>
+                <label class="block text-sm font-bold text-slate-700 mb-1">Link de Compra (Opcional)</label>
+                <input type="text" name="link_compra" placeholder="https://..." class="w-full border p-2 rounded text-blue-600">
             </div>
+        </div>
 
-            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
-                <h3 class="text-xs font-bold text-slate-400 uppercase mb-3">Cálculo de Custo</h3>
-                
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                        <label class="block text-xs text-slate-600">Preço Pago (R$)</label>
-                        <input type="number" step="0.01" name="custo" placeholder="Vl. Compra" class="w-full border border-slate-300 p-1 rounded text-sm" required>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-600">Qtd da Embalagem</label>
-                        <input type="number" step="0.1" name="qtd_compra" placeholder="Ex: 5000ml" class="w-full border border-slate-300 p-1 rounded text-sm" required>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-blue-800">Gasto Médio por Moto</label>
-                    <div class="flex items-center">
-                        <input type="number" step="0.1" name="gasto_medio" placeholder="Ex: 50" class="w-full border-2 border-blue-200 p-2 rounded text-sm focus:border-blue-500" required>
-                        <span class="ml-2 text-xs font-bold text-slate-500">p/ Lavagem</span>
-                    </div>
-                    <p class="text-[10px] text-slate-500 mt-1">*O sistema descontará isso automaticamente ao concluir uma lavagem.</p>
-                </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase">Unidade</label>
+                <select name="unidade" class="w-full border p-2 rounded bg-slate-50">
+                    <option value="ml">Mililitros (ml)</option>
+                    <option value="g">Gramas (g)</option>
+                    <option value="un">Unidade (un)</option>
+                </select>
             </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase">Estoque Inicial</label>
+                <input type="number" step="0.1" name="estoque_inicial" placeholder="Qtd" class="w-full border p-2 rounded" required>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase">Preço Pago (R$)</label>
+                <input type="number" step="0.01" name="custo" placeholder="Vl. Total" class="w-full border p-2 rounded" required>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase">Tam. Embalagem</label>
+                <input type="number" step="0.1" name="qtd_compra" placeholder="Ex: 500" class="w-full border p-2 rounded" required>
+            </div>
+        </div>
 
-            <button type="submit" class="w-full bg-slate-800 text-white font-bold py-3 rounded hover:bg-slate-900 transition shadow-lg">
-                Cadastrar Produto
-            </button>
-        </form>
-    </div>
+        <div class="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
+            <label class="block text-xs font-bold text-blue-800 uppercase mb-1">Gasto Médio por Moto (Dose)</label>
+            <input type="number" step="0.1" name="gasto_medio" placeholder="Ex: 50" class="w-full border-2 border-blue-200 p-2 rounded text-sm focus:border-blue-500" required>
+            <p class="text-[10px] text-slate-500 mt-1">*Quantidade descontada automaticamente a cada lavagem.</p>
+        </div>
 
-    <div class="lg:col-span-2">
-        <h2 class="text-2xl font-bold text-slate-800 mb-4">Estoque Atual & Custos</h2>
-        
-        <div class="overflow-x-auto bg-white rounded-xl shadow border border-slate-200">
+        <div class="flex justify-end gap-2">
+            <button type="button" onclick="toggleNovoProduto()" class="bg-gray-200 text-slate-600 font-bold py-2 px-4 rounded hover:bg-gray-300">Cancelar</button>
+            <button type="submit" class="bg-slate-800 text-white font-bold py-2 px-6 rounded hover:bg-slate-900 shadow-lg">Salvar</button>
+        </div>
+    </form>
+</div>
+
+<div class="mb-10">
+    <h3 class="text-xl font-bold text-green-700 mb-4 flex items-center gap-2">
+        <span class="w-3 h-3 rounded-full bg-green-500 block"></span> Em Estoque
+    </h3>
+    
+    <div class="bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-slate-100 text-slate-600 uppercase text-xs tracking-wider">
-                        <th class="p-4 font-bold">Produto</th>
-                        <th class="p-4 font-bold text-center">Nível Estoque</th>
-                        <th class="p-4 font-bold text-center">Custo p/ Moto</th>
-                        <th class="p-4 font-bold text-center">Rendimento Est.</th>
+                        <th class="p-4">Produto</th>
+                        <th class="p-4 text-center">Valor Pago</th>
+                        <th class="p-4 w-1/3">Nível Estoque</th>
+                        <th class="p-4 text-center">Custo p/ Moto</th>
+                        <th class="p-4 text-center">Rendimento</th>
+                        <th class="p-4 text-center">Ações</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    {% for prod in produtos %}
-                    <tr class="hover:bg-slate-50 transition">
+                    {% for prod in produtos if prod.estoque_atual > 0 %}
+                    <tr class="hover:bg-slate-50 transition group">
                         <td class="p-4">
-                            <p class="font-bold text-slate-800">{{ prod.nome }}</p>
-                            <span class="text-xs text-slate-400">Embalagem: {{ prod.quantidade_compra }}{{ prod.unidade_medida }}</span>
+                            <div class="font-bold text-slate-800">{{ prod.nome }}</div>
+                            <div class="text-[10px] text-slate-400">Emb: {{ prod.quantidade_compra }}{{ prod.unidade_medida }}</div>
                         </td>
                         
-                        <td class="p-4 text-center">
-                            <div class="w-full bg-gray-200 rounded-full h-2.5 mb-1 dark:bg-gray-200">
-                                {% set porcentagem = (prod.estoque_atual / prod.quantidade_compra) * 100 %}
-                                <div class="h-2.5 rounded-full {{ 'bg-red-500' if porcentagem < 20 else 'bg-green-500' }}" style="width: {{ porcentagem }}%"></div>
+                        <td class="p-4 text-center font-mono text-slate-600 text-sm">
+                            R$ {{ "%.2f"|format(prod.custo_compra) }}
+                        </td>
+
+                        <td class="p-4">
+                            <div class="flex items-center gap-2">
+                                <div class="flex-1 bg-gray-200 rounded-full h-2.5">
+                                    {% set porcentagem = (prod.estoque_atual / prod.quantidade_compra) * 100 if prod.quantidade_compra > 0 else 0 %}
+                                    <div class="h-2.5 rounded-full {{ 'bg-red-500' if porcentagem < 20 else 'bg-green-500' }}" style="width: {{ [porcentagem, 100]|min }}%"></div>
+                                </div>
+                                <span class="text-xs font-bold w-16 text-right {{ 'text-red-600' if prod.estoque_atual <= prod.ponto_pedido else 'text-slate-600' }}">
+                                    {{ prod.estoque_atual }}{{ prod.unidade_medida }}
+                                </span>
                             </div>
-                            <span class="text-xs font-bold {{ 'text-red-600' if prod.estoque_atual <= prod.ponto_pedido else 'text-slate-600' }}">
-                                {{ prod.estoque_atual }} {{ prod.unidade_medida }}
-                            </span>
                         </td>
 
                         <td class="p-4 text-center">
-                            <span class="bg-blue-100 text-blue-800 py-1 px-3 rounded-full text-xs font-bold">
+                            <span class="bg-blue-50 text-blue-700 py-1 px-2 rounded text-xs font-bold border border-blue-100">
                                 R$ {{ "%.2f"|format(prod.custo_por_dose) }}
                             </span>
                         </td>
@@ -100,18 +112,104 @@
                         <td class="p-4 text-center">
                             {% if prod.gasto_medio_lavagem > 0 %}
                                 {% set lavagens_restantes = prod.estoque_atual / prod.gasto_medio_lavagem %}
-                                <span class="font-mono text-sm {{ 'text-red-500 font-bold' if lavagens_restantes < 10 else 'text-slate-600' }}">
-                                    {{ "%.0f"|format(lavagens_restantes) }} Lavagens
+                                <span class="font-mono text-xs {{ 'text-red-500 font-bold' if lavagens_restantes < 10 else 'text-slate-500' }}">
+                                    {{ "%.0f"|format(lavagens_restantes) }} motos
                                 </span>
-                            {% else %}
-                                <span class="text-xs text-gray-400">-</span>
-                            {% endif %}
+                            {% else %} - {% endif %}
+                        </td>
+
+                        <td class="p-4 text-center">
+                            <div class="flex justify-center gap-2">
+                                {% if prod.link_compra %}
+                                <a href="{{ prod.link_compra }}" target="_blank" class="text-blue-500 hover:text-blue-700" title="Ir para loja">
+                                    <i class="fa-solid fa-cart-shopping"></i>
+                                </a>
+                                {% endif %}
+                                <button onclick="abrirModalEditar(
+                                    '{{ prod.id }}', 
+                                    '{{ prod.nome }}', 
+                                    '{{ prod.unidade_medida }}', 
+                                    '{{ prod.estoque_atual }}', 
+                                    '{{ prod.custo_compra }}', 
+                                    '{{ prod.quantidade_compra }}', 
+                                    '{{ prod.gasto_medio_lavagem }}', 
+                                    '{{ prod.link_compra if prod.link_compra else '' }}'
+                                )" class="text-slate-400 hover:text-blue-600 transition" title="Editar">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" class="p-8 text-center text-slate-400">
-                            Nenhum produto cadastrado. Adicione seus insumos ao lado.
+                        <td colspan="6" class="p-6 text-center text-slate-400 italic">Nenhum produto em estoque no momento.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div>
+    <h3 class="text-xl font-bold text-slate-500 mb-4 flex items-center gap-2 opacity-80">
+        <span class="w-3 h-3 rounded-full bg-slate-400 block"></span> Fora de Estoque
+    </h3>
+
+    <div class="bg-slate-50 rounded-xl shadow-inner border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-100 text-slate-400 uppercase text-xs tracking-wider">
+                        <th class="p-4">Produto</th>
+                        <th class="p-4 text-center">Valor Pago</th>
+                        <th class="p-4 text-center">Nível Estoque</th>
+                        <th class="p-4 text-center">Custo p/ Moto</th>
+                        <th class="p-4 text-center">Rendimento Est.</th>
+                        <th class="p-4 text-center">Link</th>
+                        <th class="p-4 text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 text-slate-400">
+                    {% for prod in produtos if prod.estoque_atual <= 0 %}
+                    <tr class="hover:bg-slate-100 transition">
+                        <td class="p-4 font-bold opacity-75">{{ prod.nome }}</td>
+                        
+                        <td class="p-4 text-center font-mono opacity-60">R$ 0,00</td>
+                        
+                        <td class="p-4 text-center font-bold text-red-400 bg-red-50 rounded">0 {{ prod.unidade_medida }}</td>
+
+                        <td class="p-4 text-center opacity-75">
+                            R$ {{ "%.2f"|format(prod.custo_por_dose) }}
+                        </td>
+
+                        <td class="p-4 text-center opacity-75">
+                            {{ "%.1f"|format(prod.gasto_medio_lavagem) }}{{ prod.unidade_medida }} /moto
+                        </td>
+
+                        <td class="p-4 text-center">
+                            {% if prod.link_compra %}
+                            <a href="{{ prod.link_compra }}" target="_blank" class="text-blue-400 hover:text-blue-600 font-bold text-xs border border-blue-200 px-2 py-1 rounded">
+                                COMPRAR
+                            </a>
+                            {% else %}
+                            <span class="text-xs italic">Sem link</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="p-4 text-center">
+                            <button onclick="abrirModalEditar(
+                                '{{ prod.id }}', 
+                                '{{ prod.nome }}', 
+                                '{{ prod.unidade_medida }}', 
+                                '{{ prod.estoque_atual }}', 
+                                '{{ prod.custo_compra }}', 
+                                '{{ prod.quantidade_compra }}', 
+                                '{{ prod.gasto_medio_lavagem }}', 
+                                '{{ prod.link_compra if prod.link_compra else '' }}'
+                            )" class="text-slate-500 hover:text-blue-600 transition p-2 bg-white rounded border border-slate-300 shadow-sm">
+                                <i class="fa-solid fa-pen"></i> Editar
+                            </button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -120,5 +218,95 @@
         </div>
     </div>
 </div>
+
+<div id="modalEditarProduto" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden z-[70] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h3 class="text-xl font-bold text-slate-800">Editar Produto</h3>
+                <button onclick="document.getElementById('modalEditarProduto').classList.add('hidden')" class="text-slate-400 hover:text-red-500 text-xl"><i class="fa-solid fa-times"></i></button>
+            </div>
+
+            <form action="{{ url_for('editar_produto') }}" method="POST">
+                <input type="hidden" name="produto_id" id="edit_id">
+                
+                <div class="mb-3">
+                    <label class="block text-sm font-bold text-slate-700 mb-1">Nome</label>
+                    <input type="text" name="nome" id="edit_nome" class="w-full border p-2 rounded bg-slate-50" required>
+                </div>
+
+                <div class="mb-3 bg-blue-50 p-2 rounded border border-blue-100">
+                    <label class="block text-xs font-bold text-blue-800 mb-1"><i class="fa-solid fa-link mr-1"></i> Link de Compra</label>
+                    <input type="text" name="link_compra" id="edit_link" placeholder="Cole o link aqui..." class="w-full border p-2 rounded text-blue-600 text-sm">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500">Estoque Atual</label>
+                        <input type="number" step="0.1" name="estoque_atual" id="edit_estoque" class="w-full border p-2 rounded font-bold" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500">Unidade</label>
+                        <select name="unidade_medida" id="edit_unidade" class="w-full border p-2 rounded bg-white">
+                            <option value="ml">ml</option>
+                            <option value="g">g</option>
+                            <option value="un">un</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-3 border-t pt-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500">Preço Pago (R$)</label>
+                        <input type="number" step="0.01" name="custo_compra" id="edit_custo" class="w-full border p-2 rounded" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500">Tam. Embalagem</label>
+                        <input type="number" step="0.1" name="quantidade_compra" id="edit_qtd_compra" class="w-full border p-2 rounded" required>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-slate-500">Gasto Médio p/ Moto</label>
+                    <input type="number" step="0.1" name="gasto_medio_lavagem" id="edit_gasto" class="w-full border p-2 rounded" required>
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <a id="btnExcluir" href="#" onclick="return confirm('Tem certeza que deseja excluir este produto?')" class="bg-red-100 text-red-600 hover:bg-red-200 font-bold py-2 px-4 rounded transition">
+                        <i class="fa-solid fa-trash"></i>
+                    </a>
+                    <button type="submit" class="flex-1 bg-green-600 text-white font-bold py-2 rounded hover:bg-green-700 shadow-lg">
+                        <i class="fa-solid fa-check"></i> Salvar Alterações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleNovoProduto() {
+        const form = document.getElementById('formNovoProduto');
+        form.classList.toggle('hidden');
+    }
+
+    function abrirModalEditar(id, nome, unidade, estoque, custo, qtd_compra, gasto, link) {
+        document.getElementById('edit_id').value = id;
+        document.getElementById('edit_nome').value = nome;
+        document.getElementById('edit_unidade').value = unidade;
+        document.getElementById('edit_estoque').value = estoque;
+        document.getElementById('edit_custo').value = custo;
+        document.getElementById('edit_qtd_compra').value = qtd_compra;
+        document.getElementById('edit_gasto').value = gasto;
+        
+        // Tratamento do Link (se for 'None' ou vazio, deixa em branco)
+        document.getElementById('edit_link').value = (link && link !== 'None') ? link : '';
+        
+        // Atualiza link de exclusão
+        document.getElementById('btnExcluir').href = "/excluir_produto/" + id;
+        
+        document.getElementById('modalEditarProduto').classList.remove('hidden');
+    }
+</script>
 
 {% endblock %}
