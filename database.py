@@ -77,6 +77,9 @@ class Produto(db.Model):
     quantidade_compra = db.Column(db.Float, nullable=False)
     gasto_medio_lavagem = db.Column(db.Float, nullable=False)
     ponto_pedido = db.Column(db.Float, default=10.0)
+    
+    # Novo campo para link de compra (opcional)
+    link_compra = db.Column(db.String(300), nullable=True)
 
     @property
     def custo_por_dose(self):
