@@ -272,7 +272,7 @@
                 </div>
 
                 <div class="flex gap-2 pt-2">
-                    <a id="btnExcluir" href="#" onclick="return confirm('Tem certeza que deseja excluir este produto?')" class="bg-red-100 text-red-600 hover:bg-red-200 font-bold py-2 px-4 rounded transition">
+                    <a id="btnExcluir" href="#" class="bg-red-100 text-red-600 hover:bg-red-200 font-bold py-2 px-4 rounded transition">
                         <i class="fa-solid fa-trash"></i>
                     </a>
                     <button type="submit" class="flex-1 bg-green-600 text-white font-bold py-2 rounded hover:bg-green-700 shadow-lg">
@@ -302,8 +302,17 @@
         // Tratamento do Link (se for 'None' ou vazio, deixa em branco)
         document.getElementById('edit_link').value = (link && link !== 'None') ? link : '';
         
-        // Atualiza link de exclusão
-        document.getElementById('btnExcluir').href = "/excluir_produto/" + id;
+        // LÓGICA DINÂMICA DE EXCLUSÃO/ZERAR ESTOQUE
+        const btnExcluir = document.getElementById('btnExcluir');
+        btnExcluir.href = "/excluir_produto/" + id;
+        
+        if (parseFloat(estoque) > 0) {
+            btnExcluir.setAttribute('onclick', "return confirm('Isso moverá o produto para Fora de Estoque (Quantidade será zerada). Deseja continuar?')");
+            btnExcluir.title = "Mover para Fora de Estoque";
+        } else {
+            btnExcluir.setAttribute('onclick', "return confirm('ATENÇÃO: Isso apagará o produto PERMANENTEMENTE do sistema e não poderá ser desfeito. Tem certeza?')");
+            btnExcluir.title = "Excluir Permanentemente";
+        }
         
         document.getElementById('modalEditarProduto').classList.remove('hidden');
     }
