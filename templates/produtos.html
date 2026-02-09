@@ -119,7 +119,7 @@
                         </td>
 
                         <td class="p-4 text-center">
-                            <div class="flex justify-center gap-2">
+                            <div class="flex justify-center gap-3 items-center">
                                 {% if prod.link_compra %}
                                 <a href="{{ prod.link_compra }}" target="_blank" class="text-blue-500 hover:text-blue-700" title="Ir para loja">
                                     <i class="fa-solid fa-cart-shopping"></i>
@@ -134,7 +134,7 @@
                                     '{{ prod.quantidade_compra }}', 
                                     '{{ prod.gasto_medio_lavagem }}', 
                                     '{{ prod.link_compra if prod.link_compra else '' }}'
-                                )" class="text-slate-400 hover:text-blue-600 transition" title="Editar">
+                                )" class="text-slate-400 hover:text-blue-600 transition text-xl" title="Editar">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
                             </div>
@@ -207,8 +207,8 @@
                                 '{{ prod.quantidade_compra }}', 
                                 '{{ prod.gasto_medio_lavagem }}', 
                                 '{{ prod.link_compra if prod.link_compra else '' }}'
-                            )" class="text-slate-500 hover:text-blue-600 transition p-2 bg-white rounded border border-slate-300 shadow-sm">
-                                <i class="fa-solid fa-pen"></i> Editar
+                            )" class="text-slate-500 hover:text-blue-600 transition p-2 bg-white rounded border border-slate-300 shadow-sm text-lg">
+                                <i class="fa-solid fa-pen-to-square"></i> Editar
                             </button>
                         </td>
                     </tr>
