@@ -75,46 +75,54 @@ def inicializar_servicos_padrao():
 
 def inicializar_produtos_padrao():
     """
-    Cadastra os produtos iniciais com estoque zerado e valor zerado
-    apenas se a tabela estiver vazia.
+    Cadastra os produtos iniciais com estoque zerado e valor zerado.
+    Verifica item por item para garantir que sejam criados mesmo se o banco já tiver dados.
     """
     try:
-        if Produto.query.first() is None:
-            # Lista fornecida: Nome, Unidade, Gasto Médio
-            # Custo e Estoque iniciam Zerados (0.0)
-            produtos_iniciais = [
-                ("V-Floc (Shampoo)", "ml", 10.0),
-                ("Vexus (Rodas/Motor)", "ml", 100.0),
-                ("Izer (Descont. Ferroso)", "ml", 40.0),
-                ("H-7 (Desengraxante)", "ml", 150.0),
-                ("Shiny (Pneu/Brilho)", "ml", 20.0),
-                ("Hidracouro (Bancos)", "ml", 15.0),
-                ("Prizm (Vidros/Metais)", "ml", 10.0),
-                ("Glazy (Viseira)", "ml", 15.0),
-                ("Restaurax (Plásticos Ext)", "ml", 20.0),
-                ("Intense (Plásticos Int)", "ml", 20.0),
-                ("Sanitizante (Estofados)", "ml", 30.0),
-                ("V-Lub (Borrachas)", "ml", 10.0),
-                ("Blend Spray (Cera/Brilho)", "ml", 15.0),
-                ("Lub. Corrente (Spray)", "ml", 15.0),
-                ("Graxa Branca/Lítio", "g", 300.0)
-            ]
+        # Lista fornecida: Nome, Unidade, Gasto Médio
+        # Custo e Estoque iniciam Zerados (0.0)
+        produtos_iniciais = [
+            ("V-Floc (Shampoo)", "ml", 10.0),
+            ("Vexus (Rodas/Motor)", "ml", 100.0),
+            ("Izer (Descont. Ferroso)", "ml", 40.0),
+            ("H-7 (Desengraxante)", "ml", 150.0),
+            ("Shiny (Pneu/Brilho)", "ml", 20.0),
+            ("Hidracouro (Bancos)", "ml", 15.0),
+            ("Prizm (Vidros/Metais)", "ml", 10.0),
+            ("Glazy (Viseira)", "ml", 15.0),
+            ("Restaurax (Plásticos Ext)", "ml", 20.0),
+            ("Intense (Plásticos Int)", "ml", 20.0),
+            ("Sanitizante (Estofados)", "ml", 30.0),
+            ("V-Lub (Borrachas)", "ml", 10.0),
+            ("Blend Spray (Cera/Brilho)", "ml", 15.0),
+            ("Lub. Corrente (Spray)", "ml", 15.0),
+            ("Graxa Branca/Lítio", "g", 300.0)
+        ]
+        
+        count_novos = 0
+        
+        for nome, un, gasto in produtos_iniciais:
+            # Verifica se JÁ EXISTE um produto com esse exato nome
+            produto_existente = Produto.query.filter_by(nome=nome).first()
             
-            for nome, un, gasto in produtos_iniciais:
+            if not produto_existente:
                 novo = Produto(
                     nome=nome,
                     unidade_medida=un,
                     estoque_atual=0.0,
                     custo_compra=0.0,
-                    quantidade_compra=0.0, # Evita divisão por zero na view, mas valor é 0
+                    quantidade_compra=0.0, # Valor zerado
                     gasto_medio_lavagem=gasto,
                     ponto_pedido=5.0, # Alerta padrão
                     link_compra=""
                 )
                 db.session.add(novo)
-            
+                count_novos += 1
+        
+        if count_novos > 0:
             db.session.commit()
-            print("--- Produtos Iniciais Cadastrados (Zerados) ---")
+            print(f"--- {count_novos} Produtos Iniciais Cadastrados (Zerados) ---")
+            
     except Exception as e:
         print(f"Erro ao inicializar produtos: {e}")
 
@@ -122,7 +130,7 @@ with app.app_context():
     db.create_all()
     verificar_migracoes_banco()
     inicializar_servicos_padrao()
-    inicializar_produtos_padrao() # <--- Executa a carga inicial dos produtos
+    inicializar_produtos_padrao() # <--- Executa a carga inicial revisada
 
 try:
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
