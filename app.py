@@ -130,7 +130,7 @@ with app.app_context():
     db.create_all()
     verificar_migracoes_banco()
     inicializar_servicos_padrao()
-    inicializar_produtos_padrao() # <--- Executa a carga inicial revisada
+    inicializar_produtos_padrao() 
 
 try:
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -518,9 +518,17 @@ def excluir_produto(id):
     try:
         prod = Produto.query.get(id)
         if prod:
-            db.session.delete(prod)
-            db.session.commit()
-            flash('Produto excluído.', 'success')
+            # LÓGICA DE SEGURANÇA NA EXCLUSÃO
+            if prod.estoque_atual > 0:
+                # Se tem estoque, NÃO apaga. Apenas zera e move para "Fora de Estoque"
+                prod.estoque_atual = 0.0
+                db.session.commit()
+                flash('Produto movido para "Fora de Estoque" (Quantidade zerada).', 'info')
+            else:
+                # Se já está zerado, apaga permanentemente
+                db.session.delete(prod)
+                db.session.commit()
+                flash('Produto excluído permanentemente.', 'success')
     except Exception as e:
         flash(f'Erro ao excluir: {e}', 'error')
     return redirect(url_for('gerenciar_produtos'))
