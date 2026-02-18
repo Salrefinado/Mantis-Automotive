@@ -82,22 +82,38 @@ def inicializar_produtos_padrao():
         # Lista fornecida: Nome, Unidade, Gasto Médio
         # Custo e Estoque iniciam Zerados (0.0)
         produtos_iniciais = [
-            ("V-Floc (Shampoo)", "ml", 10.0),
-            ("Vexus (Rodas/Motor)", "ml", 100.0),
-            ("Izer (Descont. Ferroso)", "ml", 40.0),
-            ("H-7 (Desengraxante)", "ml", 150.0),
-            ("Shiny (Pneu/Brilho)", "ml", 20.0),
-            ("Hidracouro (Bancos)", "ml", 15.0),
-            ("Prizm (Vidros/Metais)", "ml", 10.0),
-            ("Glazy (Viseira)", "ml", 15.0),
-            ("Restaurax (Plásticos Ext)", "ml", 20.0),
-            ("Intense (Plásticos Int)", "ml", 20.0),
-            ("Sanitizante (Estofados)", "ml", 30.0),
-            ("V-Lub (Borrachas)", "ml", 10.0),
-            ("Blend Spray (Cera/Brilho)", "ml", 15.0),
-            ("Lub. Corrente (Spray)", "ml", 15.0),
-            ("Graxa Branca/Lítio", "g", 300.0)
-        ]
+    ("Moto-V (Shampoo p/ graxa e barro)", "ml", 10.0),
+    ("Rexer (Desengraxante chassis/suspen.)", "ml", 30.0),
+    ("V-Mol (Shampoo desincrustante (terra))", "ml", 10.0),
+    ("V-Floc (Shampoo neutro (manutenção))", "ml", 5.0),
+    ("Vexus (Limpador de rodas e motores)", "ml", 25.0),
+    ("Sintra Fast (APC (manoplas e detalhes))", "ml", 15.0),
+    ("Izer (Descontaminante ferroso)", "ml", 30.0),
+    ("Strike (Removedor de piche e cola)", "ml", 5.0),
+    ("Delet (Limpador de pneus/borrachas)", "ml", 20.0),
+    ("V-Bar (Clay Bar (remoção aspereza))", "g", 2.0),
+    ("V-Lub (Lubrificante p/ V-Bar)", "ml", 40.0),
+    ("Revelax (Revelador de hologramas)", "ml", 20.0),
+    ("V-Polish (Composto de refino e lustro)", "ml", 10.0),
+    ("Blend Spray (Proteção híbrida)", "ml", 10.0),
+    ("Native Paste (Cera de Carnaúba Pura)", "g", 3.0),
+    ("Tok Final (Cera rápida pós-lavagem)", "ml", 15.0),
+    ("V-80 (Selante sintético)", "ml", 10.0),
+    ("SIO2-PRO (Selante p/ pinturas foscas)", "ml", 10.0),
+    ("Verniz Motor (Proteção e brilho (motor))", "ml", 40.0),
+    ("Verom (Condicionador de motor (água))", "ml", 30.0),
+    ("Restaurax (Renovador de plásticos)", "ml", 10.0),
+    ("Revox (Selante de pneus (fosco))", "ml", 5.0),
+    ("Shiny (Brilho intenso para pneus)", "ml", 5.0),
+    ("Glazy (Limpa vidros e retrovisores)", "ml", 10.0),
+    ("Prizm (Removedor de chuva ácida)", "ml", 5.0),
+    ("Aquaglass (Repelente de água (viseiras))", "ml", 3.0),
+    ("V-Paint (Vitrificador cerâmico)", "ml", 10.0),
+    ("V-Plastic (Vitrificador p/ plásticos)", "ml", 10.0),
+    ("V-Energy (Vitrificador de Motor)", "ml", 5.0),
+    ("V-Light (Vitrificador de faróis)", "ml", 2.0),
+    ("V-Leather (Coating p/ bancos em couro)", "ml", 5.0)
+]
         
         count_novos = 0
         
@@ -558,3 +574,4 @@ def listar_clientes():
 
 if __name__ == '__main__': 
     app.run(debug=True, host='0.0.0.0')
+
