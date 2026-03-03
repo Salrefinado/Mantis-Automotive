@@ -525,11 +525,27 @@ def salvar_configuracao_financeira():
 @app.route('/restart_financeiro', methods=['POST'])
 def restart_financeiro():
     try:
-        # Apaga todo o histórico de fechamentos, resetando o déficit acumulado, lucros e retiradas históricas.
-        # Os clientes e agendamentos (DRE Mensal) não são afetados.
+        # Apaga todo o histórico de fechamentos
         db.session.query(FechamentoMensal).delete()
         db.session.commit()
-        flash('Histórico financeiro resetado! Déficits e lucros passados foram zerados (Clientes mantidos).', 'success')
+        
+        # O sistema é programado para gerar fechamentos automáticos se o mês anterior não existir.
+        # Como deletamos o mês anterior, ele tentou recalcular os custos fixos sem nenhuma moto e gerou déficit de novo.
+        # A solução é "blindar" o mês anterior criando um fechamento zerado (O marco zero da empresa).
+        _, _, _, mes_anterior_str = obter_ciclo_atual()
+        
+        marco_zero = FechamentoMensal(
+            mes_ano=mes_anterior_str,
+            total_faturado=0.0,
+            custos_totais=0.0,
+            lucro_real=0.0,
+            deficit_acumulado=0.0,
+            retiradas_extras=0.0
+        )
+        db.session.add(marco_zero)
+        db.session.commit()
+        
+        flash('Histórico financeiro resetado com sucesso! O sistema assumiu hoje como o Marco Zero das operações.', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao resetar histórico: {e}', 'error')
