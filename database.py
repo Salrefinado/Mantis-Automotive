@@ -173,3 +173,18 @@ class ConfiguracaoFinanceira(db.Model):
     
     # Operação
     capacidade_mensal = db.Column(db.Integer, default=40)
+
+# ---------------------------
+# NOVO MODELO: FECHAMENTO MENSAL (DRE)
+# ---------------------------
+class FechamentoMensal(db.Model):
+    __tablename__ = 'fechamento_mensal'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    mes_ano = db.Column(db.String(20), nullable=False, unique=True) # Ex: '2026-02'
+    data_fechamento = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    total_faturado = db.Column(db.Float, default=0.0)
+    custos_totais = db.Column(db.Float, default=0.0)
+    lucro_real = db.Column(db.Float, default=0.0)
+    deficit_acumulado = db.Column(db.Float, default=0.0) # Valor negativo que transita para o próximo mês
