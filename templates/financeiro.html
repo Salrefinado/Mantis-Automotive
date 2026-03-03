@@ -115,7 +115,7 @@
                         <td class="p-3 text-center">
                             {% set vinculados = servico.produtos_vinculados | map(attribute='id') | list %}
                             <button type="button" onclick="abrirModalInsumos({{ servico.id }}, '{{ servico.nome }}', {{ vinculados | tojson }})" class="bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200 px-3 py-1.5 rounded text-xs font-bold transition shadow-sm flex items-center justify-center gap-1 mx-auto w-full max-w-[120px]">
-                                <i class="fa-solid fa-pump-soap"></i> Receita ({{ vinculados|length }})
+                                <i class="fa-solid fa-pump-soap"></i> Produtos ({{ vinculados|length }})
                             </button>
                         </td>
                         <td class="p-3">
@@ -401,3 +401,4 @@
     }
 </script>
 {% endblock %}
+
