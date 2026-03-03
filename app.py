@@ -44,15 +44,14 @@ def verificar_migracoes_banco():
                     except Exception:
                         conn.rollback()
 
-                # 2. Migrações de PRODUTOS (Novo Campo Link)
+                # 2. Migrações de PRODUTOS
                 try:
                     conn.execute(text("ALTER TABLE produtos ADD COLUMN link_compra TEXT"))
                     conn.commit()
-                    print("--- Migração: Coluna 'link_compra' adicionada em Produtos. ---")
                 except Exception:
                     conn.rollback()
 
-                # 3. Migrações de AGENDAMENTOS (Campos Financeiros)
+                # 3. Migrações de AGENDAMENTOS
                 colunas_agendamentos = [
                     ("forma_pagamento_prevista", "VARCHAR(50)"),
                     ("forma_pagamento_real", "VARCHAR(50)"),
@@ -66,6 +65,30 @@ def verificar_migracoes_banco():
                         conn.commit()
                     except Exception:
                         conn.rollback()
+
+                # 4. Migrações CONFIGURACAO FINANCEIRA (Gestão Patrimonial)
+                colunas_config = [
+                    ("aporte_erick", "FLOAT DEFAULT 0.0"),
+                    ("aporte_andrei", "FLOAT DEFAULT 0.0"),
+                    ("capex_produtos", "FLOAT DEFAULT 0.0"),
+                    ("capex_ferramentas", "FLOAT DEFAULT 0.0"),
+                    ("capex_estrutura", "FLOAT DEFAULT 0.0"),
+                    ("capex_marketing", "FLOAT DEFAULT 0.0"),
+                    ("capex_outros", "FLOAT DEFAULT 0.0")
+                ]
+                for col, tipo in colunas_config:
+                    try:
+                        conn.execute(text(f"ALTER TABLE configuracao_financeira ADD COLUMN {col} {tipo}"))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+
+                # 5. Migrações FECHAMENTO MENSAL (Retiradas)
+                try:
+                    conn.execute(text("ALTER TABLE fechamento_mensal ADD COLUMN retiradas_extras FLOAT DEFAULT 0.0"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
                         
         except Exception as e:
             print(f"Erro ao verificar migrações: {e}")
@@ -157,7 +180,8 @@ def processar_fechamentos_pendentes():
                 total_faturado=fat_liq,
                 custos_totais=custos_totais,
                 lucro_real=lucro_real,
-                deficit_acumulado=novo_deficit
+                deficit_acumulado=novo_deficit,
+                retiradas_extras=0.0 # Inicializa com zero
             )
             db.session.add(novo_fechamento)
             db.session.commit()
@@ -328,6 +352,7 @@ def financeiro():
         Agendamento.status.in_(['Lavagem Concluída', 'Retirado'])
     ).all()
     
+    # 1. Receita e Margem
     faturamento_bruto = sum(a.valor_cobrado for a in concluidos)
     faturamento_liquido = sum(a.valor_liquido if a.valor_liquido else a.valor_cobrado for a in concluidos)
     total_taxas_pagamento = faturamento_bruto - faturamento_liquido
@@ -356,6 +381,7 @@ def financeiro():
         
     total_motos_ciclo = len(concluidos)
     
+    # 2. DRE Lista
     dre_lista = []
     for a in concluidos:
         recebido = a.valor_liquido if a.valor_liquido else a.valor_cobrado
@@ -376,6 +402,24 @@ def financeiro():
         })
         
     dre_lista.sort(key=lambda x: x['data'])
+    
+    # 3. GESTÃO PATRIMONIAL E SUSTENTAÇÃO (NOVO)
+    total_aporte = config.aporte_erick + config.aporte_andrei
+    total_capex = config.capex_produtos + config.capex_ferramentas + config.capex_estrutura + config.capex_marketing + config.capex_outros
+    
+    # Soma todo o histórico
+    todos_fechamentos = FechamentoMensal.query.all()
+    lucro_historico_fechados = sum(f.lucro_real for f in todos_fechamentos)
+    retiradas_historico = sum(f.retiradas_extras for f in todos_fechamentos)
+    
+    # Acumulado = Histórico + Mês Atual (se for ciclo fechado ou aberto)
+    lucro_acumulado = lucro_historico_fechados + lucro_estimado
+    
+    caixa_atual = total_aporte - total_capex + lucro_acumulado - retiradas_historico
+    
+    payback_percentual = (lucro_acumulado / total_aporte * 100) if total_aporte > 0 else 0
+    
+    is_sustentavel = lucro_estimado >= 0
     
     servicos = Servico.query.order_by(Servico.categoria, Servico.valor).all()
     produtos_todos = Produto.query.order_by(Produto.nome).all()
@@ -411,7 +455,14 @@ def financeiro():
                            data_inicio=data_inicio,
                            data_fim=data_fim,
                            deficit_anterior=deficit_anterior,
-                           meses_disponiveis=meses_disponiveis)
+                           meses_disponiveis=meses_disponiveis,
+                           # Novas Variaveis Patrimoniais
+                           total_aporte=total_aporte,
+                           total_capex=total_capex,
+                           lucro_acumulado=lucro_acumulado,
+                           caixa_atual=caixa_atual,
+                           payback_percentual=payback_percentual,
+                           is_sustentavel=is_sustentavel)
 
 @app.route('/vincular_produtos_servico', methods=['POST'])
 def vincular_produtos_servico():
@@ -440,22 +491,33 @@ def salvar_configuracao_financeira():
             config = ConfiguracaoFinanceira()
             db.session.add(config)
         
-        config.aluguel_iptu = float(request.form.get('aluguel_iptu', 0))
-        config.pro_labore = float(request.form.get('pro_labore', 0))
-        config.agua_energia_base = float(request.form.get('agua_energia_base', 0))
-        config.internet_telefone = float(request.form.get('internet_telefone', 0))
-        config.mei_impostos = float(request.form.get('mei_impostos', 0))
-        config.marketing = float(request.form.get('marketing', 0))
-        config.seguro = float(request.form.get('seguro', 0))
+        # Custos Fixos
+        config.aluguel_iptu = float(request.form.get('aluguel_iptu', config.aluguel_iptu))
+        config.pro_labore = float(request.form.get('pro_labore', config.pro_labore))
+        config.agua_energia_base = float(request.form.get('agua_energia_base', config.agua_energia_base))
+        config.internet_telefone = float(request.form.get('internet_telefone', config.internet_telefone))
+        config.mei_impostos = float(request.form.get('mei_impostos', config.mei_impostos))
+        config.marketing = float(request.form.get('marketing', config.marketing))
+        config.seguro = float(request.form.get('seguro', config.seguro))
         
-        config.taxa_debito = float(request.form.get('taxa_debito', 0))
-        config.taxa_credito_vista = float(request.form.get('taxa_credito_vista', 0))
-        config.taxa_credito_parcelado = float(request.form.get('taxa_credito_parcelado', 0))
-        config.minimo_parcelamento = float(request.form.get('minimo_parcelamento', 0))
-        config.capacidade_mensal = int(request.form.get('capacidade_mensal', 40))
+        # Taxas
+        config.taxa_debito = float(request.form.get('taxa_debito', config.taxa_debito))
+        config.taxa_credito_vista = float(request.form.get('taxa_credito_vista', config.taxa_credito_vista))
+        config.taxa_credito_parcelado = float(request.form.get('taxa_credito_parcelado', config.taxa_credito_parcelado))
+        config.minimo_parcelamento = float(request.form.get('minimo_parcelamento', config.minimo_parcelamento))
+        config.capacidade_mensal = int(request.form.get('capacidade_mensal', config.capacidade_mensal))
+        
+        # Patrimonial (Aportes e CAPEX)
+        config.aporte_erick = float(request.form.get('aporte_erick', config.aporte_erick))
+        config.aporte_andrei = float(request.form.get('aporte_andrei', config.aporte_andrei))
+        config.capex_produtos = float(request.form.get('capex_produtos', config.capex_produtos))
+        config.capex_ferramentas = float(request.form.get('capex_ferramentas', config.capex_ferramentas))
+        config.capex_estrutura = float(request.form.get('capex_estrutura', config.capex_estrutura))
+        config.capex_marketing = float(request.form.get('capex_marketing', config.capex_marketing))
+        config.capex_outros = float(request.form.get('capex_outros', config.capex_outros))
         
         db.session.commit()
-        flash('Configurações financeiras atualizadas com sucesso!', 'success')
+        flash('Configurações financeiras e patrimoniais atualizadas com sucesso!', 'success')
     except Exception as e:
         flash(f'Erro ao salvar configurações: {e}', 'error')
     return redirect(url_for('financeiro'))
