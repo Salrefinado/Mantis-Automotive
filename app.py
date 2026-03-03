@@ -3,10 +3,10 @@ import locale
 import math
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from sqlalchemy import text
 from urllib.parse import unquote
-from database import db, Cliente, Moto, Agendamento, Produto, MidiaAgendamento, Servico, ConfiguracaoFinanceira
+from database import db, Cliente, Moto, Agendamento, Produto, MidiaAgendamento, Servico, ConfiguracaoFinanceira, FechamentoMensal
 
 app = Flask(__name__)
 
@@ -26,10 +26,6 @@ db.init_app(app)
 
 # --- FUNÇÃO DE MIGRAÇÃO AUTOMÁTICA (CORREÇÃO DE BANCO) ---
 def verificar_migracoes_banco():
-    """
-    Verifica se as novas colunas existem no banco de dados.
-    Se não existirem, cria-as automaticamente.
-    """
     with app.app_context():
         try:
             with db.engine.connect() as conn:
@@ -74,6 +70,99 @@ def verificar_migracoes_banco():
         except Exception as e:
             print(f"Erro ao verificar migrações: {e}")
 
+# --- FUNÇÕES DE CICLO FINANCEIRO ---
+def get_quarto_dia_util(ano, mes):
+    dias_uteis = 0
+    dia = 1
+    while dias_uteis < 4:
+        dt = date(ano, mes, dia)
+        if dt.weekday() < 5: # 0 a 4 são Segunda a Sexta
+            dias_uteis += 1
+        if dias_uteis < 4:
+            dia += 1
+    return date(ano, mes, dia)
+
+def get_mes_anterior(ano, mes):
+    if mes == 1: return ano - 1, 12
+    return ano, mes - 1
+
+def get_proximo_mes(ano, mes):
+    if mes == 12: return ano + 1, 1
+    return ano, mes + 1
+    
+def obter_ciclo_atual(data_ref=None):
+    if not data_ref:
+        data_ref = datetime.now().date()
+        
+    quarto_dia_atual = get_quarto_dia_util(data_ref.year, data_ref.month)
+    
+    if data_ref <= quarto_dia_atual:
+        ano_ant, mes_ant = get_mes_anterior(data_ref.year, data_ref.month)
+        quarto_dia_ant = get_quarto_dia_util(ano_ant, mes_ant)
+        
+        data_inicio = quarto_dia_ant + timedelta(days=1)
+        data_fim = quarto_dia_atual
+        mes_referencia = f"{ano_ant}-{mes_ant:02d}"
+        mes_anterior_str = f"{get_mes_anterior(ano_ant, mes_ant)[0]}-{get_mes_anterior(ano_ant, mes_ant)[1]:02d}"
+    else:
+        ano_prox, mes_prox = get_proximo_mes(data_ref.year, data_ref.month)
+        quarto_dia_prox = get_quarto_dia_util(ano_prox, mes_prox)
+        
+        data_inicio = quarto_dia_atual + timedelta(days=1)
+        data_fim = quarto_dia_prox
+        mes_referencia = f"{data_ref.year}-{data_ref.month:02d}"
+        mes_anterior_str = f"{get_mes_anterior(data_ref.year, data_ref.month)[0]}-{get_mes_anterior(data_ref.year, data_ref.month)[1]:02d}"
+        
+    return data_inicio, data_fim, mes_referencia, mes_anterior_str
+    
+def processar_fechamentos_pendentes():
+    try:
+        _, _, _, mes_anterior_str = obter_ciclo_atual()
+        fechamento_ant = FechamentoMensal.query.filter_by(mes_ano=mes_anterior_str).first()
+        
+        if not fechamento_ant:
+            ano_str, mes_str = map(int, mes_anterior_str.split('-'))
+            ano_prox, mes_prox = get_proximo_mes(ano_str, mes_str)
+            
+            q_dia_inicio = get_quarto_dia_util(ano_str, mes_str)
+            q_dia_fim = get_quarto_dia_util(ano_prox, mes_prox)
+            
+            inicio_ciclo = q_dia_inicio + timedelta(days=1)
+            fim_ciclo = q_dia_fim
+            
+            concluidos = Agendamento.query.filter(
+                Agendamento.data_agendada >= datetime.combine(inicio_ciclo, datetime.min.time()),
+                Agendamento.data_agendada <= datetime.combine(fim_ciclo, datetime.max.time()),
+                Agendamento.status.in_(['Lavagem Concluída', 'Retirado'])
+            ).all()
+            
+            fat_liq = sum(a.valor_liquido if a.valor_liquido else a.valor_cobrado for a in concluidos)
+            custo_prod = sum(a.custo_total_produtos for a in concluidos)
+            
+            config = ConfiguracaoFinanceira.query.first()
+            custos_fixos_base = config.aluguel_iptu + config.pro_labore + config.agua_energia_base + config.internet_telefone + config.mei_impostos + config.marketing + config.seguro if config else 0
+            
+            ano_ant_ant, mes_ant_ant = get_mes_anterior(ano_str, mes_str)
+            mes_ant_ant_str = f"{ano_ant_ant}-{mes_ant_ant:02d}"
+            fechamento_ant_ant = FechamentoMensal.query.filter_by(mes_ano=mes_ant_ant_str).first()
+            deficit_ant = abs(fechamento_ant_ant.deficit_acumulado) if fechamento_ant_ant and fechamento_ant_ant.deficit_acumulado < 0 else 0
+            
+            custos_totais = custos_fixos_base + custo_prod + deficit_ant
+            lucro_real = fat_liq - custos_totais
+            novo_deficit = lucro_real if lucro_real < 0 else 0
+            
+            novo_fechamento = FechamentoMensal(
+                mes_ano=mes_anterior_str,
+                total_faturado=fat_liq,
+                custos_totais=custos_totais,
+                lucro_real=lucro_real,
+                deficit_acumulado=novo_deficit
+            )
+            db.session.add(novo_fechamento)
+            db.session.commit()
+    except Exception as e:
+        print(f"Erro ao processar fechamentos pendentes: {e}")
+
 def inicializar_configuracoes_financeiras():
     try:
         if ConfiguracaoFinanceira.query.first() is None:
@@ -100,60 +189,49 @@ def inicializar_servicos_padrao():
         print(f"Erro ao inicializar serviços: {e}")
 
 def inicializar_produtos_padrao():
-    """
-    Cadastra os produtos iniciais com estoque zerado e valor zerado.
-    Verifica item por item para garantir que sejam criados mesmo se o banco já tiver dados.
-    """
     try:
         produtos_iniciais = [
-    ("Moto-V (Shampoo p/ graxa e barro)", "ml", 10.0),
-    ("Rexer (Desengraxante chassis/suspen.)", "ml", 30.0),
-    ("V-Mol (Shampoo desincrustante (terra))", "ml", 10.0),
-    ("V-Floc (Shampoo neutro (manutenção))", "ml", 5.0),
-    ("Vexus (Limpador de rodas e motores)", "ml", 25.0),
-    ("Sintra Fast (APC (manoplas e detalhes))", "ml", 15.0),
-    ("Izer (Descontaminante ferroso)", "ml", 30.0),
-    ("Strike (Removedor de piche e cola)", "ml", 5.0),
-    ("Delet (Limpador de pneus/borrachas)", "ml", 20.0),
-    ("V-Bar (Clay Bar (remoção aspereza))", "g", 2.0),
-    ("V-Lub (Lubrificante p/ V-Bar)", "ml", 40.0),
-    ("Revelax (Revelador de hologramas)", "ml", 20.0),
-    ("V-Polish (Composto de refino e lustro)", "ml", 10.0),
-    ("Blend Spray (Proteção híbrida)", "ml", 10.0),
-    ("Native Paste (Cera de Carnaúba Pura)", "g", 3.0),
-    ("Tok Final (Cera rápida pós-lavagem)", "ml", 15.0),
-    ("V-80 (Selante sintético)", "ml", 10.0),
-    ("SIO2-PRO (Selante p/ pinturas foscas)", "ml", 10.0),
-    ("Verniz Motor (Proteção e brilho (motor))", "ml", 40.0),
-    ("Verom (Condicionador de motor (água))", "ml", 30.0),
-    ("Restaurax (Renovador de plásticos)", "ml", 10.0),
-    ("Revox (Selante de pneus (fosco))", "ml", 5.0),
-    ("Shiny (Brilho intenso para pneus)", "ml", 5.0),
-    ("Glazy (Limpa vidros e retrovisores)", "ml", 10.0),
-    ("Prizm (Removedor de chuva ácida)", "ml", 5.0),
-    ("Aquaglass (Repelente de água (viseiras))", "ml", 3.0),
-    ("V-Paint (Vitrificador cerâmico)", "ml", 10.0),
-    ("V-Plastic (Vitrificador p/ plásticos)", "ml", 10.0),
-    ("V-Energy (Vitrificador de Motor)", "ml", 5.0),
-    ("V-Light (Vitrificador de faróis)", "ml", 2.0),
-    ("V-Leather (Coating p/ bancos em couro)", "ml", 5.0)
-]
+            ("Moto-V (Shampoo p/ graxa e barro)", "ml", 10.0),
+            ("Rexer (Desengraxante chassis/suspen.)", "ml", 30.0),
+            ("V-Mol (Shampoo desincrustante (terra))", "ml", 10.0),
+            ("V-Floc (Shampoo neutro (manutenção))", "ml", 5.0),
+            ("Vexus (Limpador de rodas e motores)", "ml", 25.0),
+            ("Sintra Fast (APC (manoplas e detalhes))", "ml", 15.0),
+            ("Izer (Descontaminante ferroso)", "ml", 30.0),
+            ("Strike (Removedor de piche e cola)", "ml", 5.0),
+            ("Delet (Limpador de pneus/borrachas)", "ml", 20.0),
+            ("V-Bar (Clay Bar (remoção aspereza))", "g", 2.0),
+            ("V-Lub (Lubrificante p/ V-Bar)", "ml", 40.0),
+            ("Revelax (Revelador de hologramas)", "ml", 20.0),
+            ("V-Polish (Composto de refino e lustro)", "ml", 10.0),
+            ("Blend Spray (Proteção híbrida)", "ml", 10.0),
+            ("Native Paste (Cera de Carnaúba Pura)", "g", 3.0),
+            ("Tok Final (Cera rápida pós-lavagem)", "ml", 15.0),
+            ("V-80 (Selante sintético)", "ml", 10.0),
+            ("SIO2-PRO (Selante p/ pinturas foscas)", "ml", 10.0),
+            ("Verniz Motor (Proteção e brilho (motor))", "ml", 40.0),
+            ("Verom (Condicionador de motor (água))", "ml", 30.0),
+            ("Restaurax (Renovador de plásticos)", "ml", 10.0),
+            ("Revox (Selante de pneus (fosco))", "ml", 5.0),
+            ("Shiny (Brilho intenso para pneus)", "ml", 5.0),
+            ("Glazy (Limpa vidros e retrovisores)", "ml", 10.0),
+            ("Prizm (Removedor de chuva ácida)", "ml", 5.0),
+            ("Aquaglass (Repelente de água (viseiras))", "ml", 3.0),
+            ("V-Paint (Vitrificador cerâmico)", "ml", 10.0),
+            ("V-Plastic (Vitrificador p/ plásticos)", "ml", 10.0),
+            ("V-Energy (Vitrificador de Motor)", "ml", 5.0),
+            ("V-Light (Vitrificador de faróis)", "ml", 2.0),
+            ("V-Leather (Coating p/ bancos em couro)", "ml", 5.0)
+        ]
         
         count_novos = 0
-        
         for nome, un, gasto in produtos_iniciais:
             produto_existente = Produto.query.filter_by(nome=nome).first()
-            
             if not produto_existente:
                 novo = Produto(
-                    nome=nome,
-                    unidade_medida=un,
-                    estoque_atual=0.0,
-                    custo_compra=0.0,
-                    quantidade_compra=0.0, 
-                    gasto_medio_lavagem=gasto,
-                    ponto_pedido=5.0, 
-                    link_compra=""
+                    nome=nome, unidade_medida=un, estoque_atual=0.0,
+                    custo_compra=0.0, quantidade_compra=0.0, 
+                    gasto_medio_lavagem=gasto, ponto_pedido=5.0, link_compra=""
                 )
                 db.session.add(novo)
                 count_novos += 1
@@ -219,29 +297,95 @@ def financeiro():
         db.session.add(config)
         db.session.commit()
         
-    concluidos = Agendamento.query.filter(Agendamento.status.in_(['Lavagem Concluída', 'Retirado'])).all()
+    processar_fechamentos_pendentes()
+    
+    mes_query = request.args.get('mes')
+    hoje = datetime.now().date()
+    
+    if mes_query:
+        try:
+            ano_q, mes_q = map(int, mes_query.split('-'))
+            ano_prox, mes_prox = get_proximo_mes(ano_q, mes_q)
+            
+            q_dia_inicio = get_quarto_dia_util(ano_q, mes_q)
+            q_dia_fim = get_quarto_dia_util(ano_prox, mes_prox)
+            
+            data_inicio = q_dia_inicio + timedelta(days=1)
+            data_fim = q_dia_fim
+            mes_referencia = mes_query
+            
+            ano_ant_q, mes_ant_q = get_mes_anterior(ano_q, mes_q)
+            mes_anterior_str = f"{ano_ant_q}-{mes_ant_q:02d}"
+        except:
+            data_inicio, data_fim, mes_referencia, mes_anterior_str = obter_ciclo_atual(hoje)
+    else:
+        data_inicio, data_fim, mes_referencia, mes_anterior_str = obter_ciclo_atual(hoje)
+        
+    concluidos = Agendamento.query.filter(
+        Agendamento.data_agendada >= datetime.combine(data_inicio, datetime.min.time()),
+        Agendamento.data_agendada <= datetime.combine(data_fim, datetime.max.time()),
+        Agendamento.status.in_(['Lavagem Concluída', 'Retirado'])
+    ).all()
     
     faturamento_bruto = sum(a.valor_cobrado for a in concluidos)
     faturamento_liquido = sum(a.valor_liquido if a.valor_liquido else a.valor_cobrado for a in concluidos)
     
     custo_produtos_total = sum(a.custo_total_produtos for a in concluidos)
-    custos_fixos_total = config.aluguel_iptu + config.pro_labore + config.agua_energia_base + config.internet_telefone + config.mei_impostos + config.marketing + config.seguro
+    
+    custos_fixos_base = config.aluguel_iptu + config.pro_labore + config.agua_energia_base + config.internet_telefone + config.mei_impostos + config.marketing + config.seguro
+    
+    fechamento_anterior = FechamentoMensal.query.filter_by(mes_ano=mes_anterior_str).first()
+    deficit_anterior = abs(fechamento_anterior.deficit_acumulado) if fechamento_anterior and fechamento_anterior.deficit_acumulado < 0 else 0.0
+    
+    custos_fixos_total = custos_fixos_base + deficit_anterior
     
     lucro_estimado = faturamento_liquido - custo_produtos_total - custos_fixos_total
     ticket_medio = faturamento_bruto / len(concluidos) if concluidos else 0
     
-    # --- CÁLCULO DA META DE MOTOS (BREAK-EVEN / PONTO DE EQUILÍBRIO) ---
     margem_contribuicao_total = faturamento_liquido - custo_produtos_total
     margem_media = margem_contribuicao_total / len(concluidos) if concluidos else 0
     
     if margem_media > 0:
         meta_motos = math.ceil(custos_fixos_total / margem_media)
     else:
-        # Estimativa padrão: se ainda não lavou motos no mês, assume R$ 70 de margem livre por moto para calcular a meta
         meta_motos = math.ceil(custos_fixos_total / 70.0) if custos_fixos_total > 0 else 0
+        
+    total_motos_ciclo = len(concluidos)
+    custo_fixo_por_moto = custos_fixos_total / total_motos_ciclo if total_motos_ciclo > 0 else 0
+    
+    dre_lista = []
+    for a in concluidos:
+        recebido = a.valor_liquido if a.valor_liquido else a.valor_cobrado
+        produtos = a.custo_total_produtos
+        desp_variaveis = a.gastos_extras
+        lucro_real_moto = recebido - produtos - desp_variaveis - custo_fixo_por_moto
+        
+        dre_lista.append({
+            'cliente': a.cliente.nome,
+            'moto': f"{a.moto.modelo} ({a.moto.placa})",
+            'data': a.data_agendada,
+            'valor_cobrado': a.valor_cobrado,
+            'forma_pagamento': a.forma_pagamento_real if a.forma_pagamento_real else (a.forma_pagamento_prevista if a.forma_pagamento_prevista else 'PIX'),
+            'valor_recebido': recebido,
+            'gasto_produtos': produtos,
+            'despesas_fixas_rateadas': custo_fixo_por_moto,
+            'despesas_variaveis': desp_variaveis,
+            'lucro_estimado': lucro_real_moto
+        })
+        
+    dre_lista.sort(key=lambda x: x['data'])
     
     servicos = Servico.query.order_by(Servico.categoria, Servico.valor).all()
     
+    meses_disponiveis = []
+    data_temp = hoje
+    for _ in range(6): 
+        m_ref = obter_ciclo_atual(data_temp)[2]
+        if m_ref not in meses_disponiveis:
+            meses_disponiveis.append(m_ref)
+        ano_t, mes_t = get_mes_anterior(data_temp.year, data_temp.month)
+        data_temp = date(ano_t, mes_t, 15)
+        
     return render_template('financeiro.html', 
                            faturamento_bruto=faturamento_bruto,
                            faturamento_liquido=faturamento_liquido,
@@ -249,10 +393,16 @@ def financeiro():
                            custos_fixos=custos_fixos_total,
                            lucro=lucro_estimado,
                            ticket_medio=ticket_medio,
-                           qtd_servicos=len(concluidos),
+                           qtd_servicos=total_motos_ciclo,
                            servicos=servicos,
                            config=config,
-                           meta_motos=meta_motos)
+                           meta_motos=meta_motos,
+                           dre_lista=dre_lista,
+                           mes_referencia=mes_referencia,
+                           data_inicio=data_inicio,
+                           data_fim=data_fim,
+                           deficit_anterior=deficit_anterior,
+                           meses_disponiveis=meses_disponiveis)
 
 @app.route('/salvar_configuracao_financeira', methods=['POST'])
 def salvar_configuracao_financeira():
