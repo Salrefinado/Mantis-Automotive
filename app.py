@@ -1,5 +1,6 @@
 import os
 import locale
+import math
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -104,8 +105,6 @@ def inicializar_produtos_padrao():
     Verifica item por item para garantir que sejam criados mesmo se o banco já tiver dados.
     """
     try:
-        # Lista fornecida: Nome, Unidade, Gasto Médio
-        # Custo e Estoque iniciam Zerados (0.0)
         produtos_iniciais = [
     ("Moto-V (Shampoo p/ graxa e barro)", "ml", 10.0),
     ("Rexer (Desengraxante chassis/suspen.)", "ml", 30.0),
@@ -143,7 +142,6 @@ def inicializar_produtos_padrao():
         count_novos = 0
         
         for nome, un, gasto in produtos_iniciais:
-            # Verifica se JÁ EXISTE um produto com esse exato nome
             produto_existente = Produto.query.filter_by(nome=nome).first()
             
             if not produto_existente:
@@ -152,9 +150,9 @@ def inicializar_produtos_padrao():
                     unidade_medida=un,
                     estoque_atual=0.0,
                     custo_compra=0.0,
-                    quantidade_compra=0.0, # Valor zerado
+                    quantidade_compra=0.0, 
                     gasto_medio_lavagem=gasto,
-                    ponto_pedido=5.0, # Alerta padrão
+                    ponto_pedido=5.0, 
                     link_compra=""
                 )
                 db.session.add(novo)
@@ -224,7 +222,6 @@ def financeiro():
     concluidos = Agendamento.query.filter(Agendamento.status.in_(['Lavagem Concluída', 'Retirado'])).all()
     
     faturamento_bruto = sum(a.valor_cobrado for a in concluidos)
-    # Faturamento líquido considera a taxa deduzida nos itens Retirados; os apenas Concluídos assumem 100% até a retirada
     faturamento_liquido = sum(a.valor_liquido if a.valor_liquido else a.valor_cobrado for a in concluidos)
     
     custo_produtos_total = sum(a.custo_total_produtos for a in concluidos)
@@ -232,6 +229,16 @@ def financeiro():
     
     lucro_estimado = faturamento_liquido - custo_produtos_total - custos_fixos_total
     ticket_medio = faturamento_bruto / len(concluidos) if concluidos else 0
+    
+    # --- CÁLCULO DA META DE MOTOS (BREAK-EVEN / PONTO DE EQUILÍBRIO) ---
+    margem_contribuicao_total = faturamento_liquido - custo_produtos_total
+    margem_media = margem_contribuicao_total / len(concluidos) if concluidos else 0
+    
+    if margem_media > 0:
+        meta_motos = math.ceil(custos_fixos_total / margem_media)
+    else:
+        # Estimativa padrão: se ainda não lavou motos no mês, assume R$ 70 de margem livre por moto para calcular a meta
+        meta_motos = math.ceil(custos_fixos_total / 70.0) if custos_fixos_total > 0 else 0
     
     servicos = Servico.query.order_by(Servico.categoria, Servico.valor).all()
     
@@ -244,7 +251,8 @@ def financeiro():
                            ticket_medio=ticket_medio,
                            qtd_servicos=len(concluidos),
                            servicos=servicos,
-                           config=config)
+                           config=config,
+                           meta_motos=meta_motos)
 
 @app.route('/salvar_configuracao_financeira', methods=['POST'])
 def salvar_configuracao_financeira():
@@ -308,7 +316,7 @@ def novo_agendamento():
         aplicar_desconto = False
         
         if cliente.qtd_descontos > 0:
-            valor = valor * 0.90 # 10% de desconto
+            valor = valor * 0.90 
             aplicar_desconto = True
             cliente.qtd_descontos -= 1 
         
@@ -577,7 +585,6 @@ def atualizar_status(id, status):
             a.taxa_aplicada = taxa
             a.valor_liquido = a.valor_cobrado - (a.valor_cobrado * (taxa / 100.0))
         else:
-            # Caso os dados não venham, assume o previsto sem descontar taxa adicional
             a.forma_pagamento_real = a.forma_pagamento_prevista
             a.valor_liquido = a.valor_cobrado
 
@@ -600,7 +607,6 @@ def upload_midia(agendamento_id):
 @app.route('/produtos', methods=['GET', 'POST'])
 def gerenciar_produtos():
     if request.method == 'POST':
-        # Criação de novo produto
         db.session.add(Produto(
             nome=request.form.get('nome'), 
             unidade_medida=request.form.get('unidade'),
@@ -608,7 +614,7 @@ def gerenciar_produtos():
             quantidade_compra=float(request.form.get('qtd_compra')),
             gasto_medio_lavagem=float(request.form.get('gasto_medio')), 
             estoque_atual=float(request.form.get('estoque_inicial')),
-            link_compra=request.form.get('link_compra') # Salva o link
+            link_compra=request.form.get('link_compra') 
         ))
         db.session.commit()
         flash('Produto cadastrado com sucesso!', 'success')
@@ -640,14 +646,11 @@ def excluir_produto(id):
     try:
         prod = Produto.query.get(id)
         if prod:
-            # LÓGICA DE SEGURANÇA NA EXCLUSÃO
             if prod.estoque_atual > 0:
-                # Se tem estoque, NÃO apaga. Apenas zera e move para "Fora de Estoque"
                 prod.estoque_atual = 0.0
                 db.session.commit()
                 flash('Produto movido para "Fora de Estoque" (Quantidade zerada).', 'info')
             else:
-                # Se já está zerado, apaga permanentemente
                 db.session.delete(prod)
                 db.session.commit()
                 flash('Produto excluído permanentemente.', 'success')
