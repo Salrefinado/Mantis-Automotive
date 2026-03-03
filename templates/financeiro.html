@@ -48,16 +48,16 @@
         </div>
         
         <div class="mt-6 pt-4 border-t border-slate-700">
-            <p class="text-xs text-slate-400 mb-2 uppercase tracking-wide font-bold">Progresso do Pro-Labore / Meta</p>
-            {% set meta_motos = (config.capacidade_mensal) if config.capacidade_mensal > 0 else 40 %}
-            {% set porcentagem_meta = (qtd_servicos / meta_motos) * 100 %}
-            <div class="w-full bg-slate-700 rounded-full h-2.5 mb-1">
-                <div class="bg-green-500 h-2.5 rounded-full" style="width: {{ [porcentagem_meta, 100]|min }}%"></div>
+            <p class="text-xs text-slate-400 mb-2 uppercase tracking-wide font-bold">Progresso da Meta (Ponto de Equilíbrio)</p>
+            {% set porcentagem_meta = (qtd_servicos / meta_motos * 100) if meta_motos > 0 else 0 %}
+            <div class="w-full bg-slate-700 rounded-full h-2.5 mb-1 mt-2">
+                <div class="bg-green-500 h-2.5 rounded-full transition-all duration-500" style="width: {{ [porcentagem_meta, 100]|min }}%"></div>
             </div>
             <div class="flex justify-between text-[10px] text-slate-400">
-                <span>{{ qtd_servicos }} motos</span>
+                <span>{{ qtd_servicos }} motos concluídas</span>
                 <span>Meta: {{ meta_motos }} motos</span>
             </div>
+            <p class="text-[9px] text-slate-500 mt-2 italic leading-tight">*A meta é a quantidade exata de lavagens necessárias para cobrir todos os custos fixos, variáveis e pró-labore. Acima disso, é lucro livre.</p>
         </div>
     </div>
     
@@ -121,7 +121,7 @@
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div class="sticky top-0 bg-white p-6 border-b z-10 flex justify-between items-center">
             <h3 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-sliders mr-2 text-blue-600"></i> Parâmetros Financeiros</h3>
-            <button onclick="document.getElementById('modalConfigFinanceira').classList.add('hidden')" class="text-slate-400 hover:text-red-500 text-xl"><i class="fa-solid fa-times"></i></button>
+            <button type="button" onclick="document.getElementById('modalConfigFinanceira').classList.add('hidden')" class="text-slate-400 hover:text-red-500 text-xl"><i class="fa-solid fa-times"></i></button>
         </div>
 
         <form action="{{ url_for('salvar_configuracao_financeira') }}" method="POST" class="p-6">
@@ -130,14 +130,26 @@
                 <div>
                     <h4 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 border-b pb-1"><i class="fa-solid fa-building text-slate-400 mr-1"></i> Custos Fixos (Mensais)</h4>
                     
-                    <div class="space-y-3">
+                    <div class="space-y-4">
                         <div>
                             <label class="block text-xs font-bold text-slate-700 mb-1">Aluguel e IPTU (R$)</label>
                             <input type="number" step="0.01" name="aluguel_iptu" value="{{ '%.2f'|format(config.aluguel_iptu) }}" class="w-full border p-2 rounded bg-slate-50 text-sm">
                         </div>
-                        <div>
+                        
+                        <div class="bg-slate-100 p-3 rounded-lg border border-slate-200">
                             <label class="block text-xs font-bold text-slate-700 mb-1">Pró-labore Total (R$)</label>
-                            <input type="number" step="0.01" name="pro_labore" value="{{ '%.2f'|format(config.pro_labore) }}" class="w-full border p-2 rounded bg-slate-50 text-sm">
+                            <input type="number" step="0.01" id="inputProLabore" name="pro_labore" value="{{ '%.2f'|format(config.pro_labore) }}" class="w-full border border-slate-300 p-2 rounded bg-white text-sm font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none" oninput="calcularSociedade()">
+                            
+                            <div class="flex gap-2 mt-3">
+                                <div class="flex-1 bg-indigo-50 p-2 rounded border border-indigo-100 text-center">
+                                    <label class="block text-[9px] font-bold text-indigo-800 uppercase tracking-wide">Sócio Erick</label>
+                                    <span class="text-sm font-bold text-indigo-900" id="valorErick">R$ 0,00</span>
+                                </div>
+                                <div class="flex-1 bg-indigo-50 p-2 rounded border border-indigo-100 text-center">
+                                    <label class="block text-[9px] font-bold text-indigo-800 uppercase tracking-wide">Sócio Andrei</label>
+                                    <span class="text-sm font-bold text-indigo-900" id="valorAndrei">R$ 0,00</span>
+                                </div>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-slate-700 mb-1">Água e Energia (Taxa Base R$)</label>
@@ -183,22 +195,36 @@
                         </div>
                     </div>
 
-                    <h4 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 border-b pb-1"><i class="fa-solid fa-bullseye text-slate-400 mr-1"></i> Operação</h4>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">Capacidade Mensal (Meta de Motos)</label>
-                        <input type="number" name="capacidade_mensal" value="{{ config.capacidade_mensal }}" class="w-full border p-2 rounded bg-slate-50 text-sm">
-                        <p class="text-[10px] text-slate-500 mt-1">Usado para calcular a barra de progresso do mês.</p>
+                    <div class="hidden">
+                        <input type="number" name="capacidade_mensal" value="{{ config.capacidade_mensal }}" class="w-full">
                     </div>
                 </div>
             </div>
 
             <div class="mt-8 pt-4 border-t flex gap-3 justify-end">
-                <button type="button" onclick="document.getElementById('modalConfigFinanceira').classList.add('hidden')" class="px-6 py-2 bg-gray-200 text-slate-700 font-bold rounded-lg hover:bg-gray-300">Cancelar</button>
-                <button type="submit" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg hover:bg-blue-700 flex items-center gap-2">
+                <button type="button" onclick="document.getElementById('modalConfigFinanceira').classList.add('hidden')" class="px-6 py-2 bg-gray-200 text-slate-700 font-bold rounded-lg hover:bg-gray-300 transition">Cancelar</button>
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg hover:bg-blue-700 transition flex items-center gap-2">
                     <i class="fa-solid fa-save"></i> Salvar Configurações
                 </button>
             </div>
         </form>
     </div>
 </div>
+
+<script>
+    function calcularSociedade() {
+        const inputValor = document.getElementById('inputProLabore').value;
+        const total = parseFloat(inputValor) || 0;
+        const metade = total / 2;
+        
+        // Formatação simples para Moeda BRL
+        const formatado = metade.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        
+        document.getElementById('valorErick').innerText = formatado;
+        document.getElementById('valorAndrei').innerText = formatado;
+    }
+    
+    // Executa ao carregar o modal/página para preencher os valores iniciais de quem já está salvo
+    document.addEventListener('DOMContentLoaded', calcularSociedade);
+</script>
 {% endblock %}
