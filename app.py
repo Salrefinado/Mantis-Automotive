@@ -376,6 +376,7 @@ def financeiro():
     dre_lista.sort(key=lambda x: x['data'])
     
     servicos = Servico.query.order_by(Servico.categoria, Servico.valor).all()
+    produtos_todos = Produto.query.order_by(Produto.nome).all()
     
     meses_disponiveis = []
     data_temp = hoje
@@ -395,6 +396,7 @@ def financeiro():
                            ticket_medio=ticket_medio,
                            qtd_servicos=total_motos_ciclo,
                            servicos=servicos,
+                           produtos_todos=produtos_todos,
                            config=config,
                            meta_motos=meta_motos,
                            dre_lista=dre_lista,
@@ -403,6 +405,25 @@ def financeiro():
                            data_fim=data_fim,
                            deficit_anterior=deficit_anterior,
                            meses_disponiveis=meses_disponiveis)
+
+@app.route('/vincular_produtos_servico', methods=['POST'])
+def vincular_produtos_servico():
+    try:
+        servico_id = request.form.get('servico_id')
+        produto_ids = request.form.getlist('produtos')
+        
+        servico = Servico.query.get(servico_id)
+        if servico:
+            servico.produtos_vinculados = [] 
+            if produto_ids:
+                produtos = Produto.query.filter(Produto.id.in_(produto_ids)).all()
+                servico.produtos_vinculados.extend(produtos)
+            db.session.commit()
+            flash(f'Insumos atualizados para o serviço {servico.nome}!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao vincular produtos: {e}', 'error')
+    return redirect(url_for('financeiro'))
 
 @app.route('/salvar_configuracao_financeira', methods=['POST'])
 def salvar_configuracao_financeira():
@@ -699,10 +720,14 @@ def atualizar_status(id, status):
         
         if a.custo_total_produtos == 0:
             custo = 0
-            for p in Produto.query.all():
-                if p.estoque_atual >= p.gasto_medio_lavagem:
-                    p.estoque_atual -= p.gasto_medio_lavagem
-                    custo += p.custo_por_dose
+            servico_realizado = Servico.query.filter_by(nome=a.tipo_servico).first()
+            
+            # Dá baixa apenas nos produtos que fazem parte da receita deste serviço específico
+            if servico_realizado and servico_realizado.produtos_vinculados:
+                for p in servico_realizado.produtos_vinculados:
+                    if p.estoque_atual >= p.gasto_medio_lavagem:
+                        p.estoque_atual -= p.gasto_medio_lavagem
+                        custo += p.custo_por_dose
             a.custo_total_produtos = custo
         
         if a.cliente.indicado_por_id:
