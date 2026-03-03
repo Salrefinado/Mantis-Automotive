@@ -161,7 +161,7 @@ class MidiaAgendamento(db.Model):
     data_upload = db.Column(db.DateTime, default=datetime.utcnow)
 
 # ---------------------------
-# MODELO: CONFIGURAÇÃO FINANCEIRA (CUSTOS FIXOS)
+# MODELO: CONFIGURAÇÃO FINANCEIRA (CUSTOS FIXOS E PATRIMÔNIO)
 # ---------------------------
 class ConfiguracaoFinanceira(db.Model):
     __tablename__ = 'configuracao_financeira'
@@ -185,9 +185,18 @@ class ConfiguracaoFinanceira(db.Model):
     
     # Operação
     capacidade_mensal = db.Column(db.Integer, default=40)
+    
+    # --- CAPEX E CAPITAL INICIAL (Gestão Patrimonial) ---
+    aporte_erick = db.Column(db.Float, default=0.0)
+    aporte_andrei = db.Column(db.Float, default=0.0)
+    capex_produtos = db.Column(db.Float, default=0.0)
+    capex_ferramentas = db.Column(db.Float, default=0.0)
+    capex_estrutura = db.Column(db.Float, default=0.0)
+    capex_marketing = db.Column(db.Float, default=0.0)
+    capex_outros = db.Column(db.Float, default=0.0)
 
 # ---------------------------
-# MODELO: FECHAMENTO MENSAL (DRE)
+# MODELO: FECHAMENTO MENSAL (DRE E HISTÓRICO DE CAIXA)
 # ---------------------------
 class FechamentoMensal(db.Model):
     __tablename__ = 'fechamento_mensal'
@@ -200,3 +209,6 @@ class FechamentoMensal(db.Model):
     custos_totais = db.Column(db.Float, default=0.0)
     lucro_real = db.Column(db.Float, default=0.0)
     deficit_acumulado = db.Column(db.Float, default=0.0) # Valor negativo que transita para o próximo mês
+    
+    # --- Retiradas Extras (Distribuição de Lucros além do Pró-labore no mês) ---
+    retiradas_extras = db.Column(db.Float, default=0.0)
