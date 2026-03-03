@@ -230,7 +230,6 @@
         <div class="grid grid-cols-1 lg:grid-cols-2">
             
             <div class="p-6 lg:border-r border-slate-200">
-                
                 <div class="mb-6">
                     <h4 class="text-sm font-bold text-slate-800 uppercase flex items-center mb-3">
                         <span class="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center mr-2 text-xs">1</span> 
@@ -293,11 +292,9 @@
                         </div>
                     </div>
                 </div>
-
             </div>
 
             <div class="p-6 bg-slate-50">
-                
                 <div class="mb-6">
                     <h4 class="text-sm font-bold text-slate-800 uppercase flex items-center mb-3">
                         <span class="bg-slate-600 text-white w-6 h-6 rounded-full flex items-center justify-center mr-2 text-xs">4</span> 
@@ -384,6 +381,69 @@
         </div>
     </div>
 </div>
+<div class="mb-12">
+    <div class="flex items-center gap-3 mb-4">
+        <div class="bg-purple-100 p-3 rounded-lg"><i class="fa-solid fa-gem text-2xl text-purple-700"></i></div>
+        <div>
+            <h3 class="text-2xl font-black text-slate-800 tracking-tight">Indicador de Sustentação Operacional</h3>
+            <p class="text-sm text-slate-500">Visão de longo prazo, patrimônio e valuation da marca</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-xl shadow-lg border border-slate-200 p-6">
+            <h4 class="text-sm font-bold text-slate-800 uppercase flex items-center mb-4 pb-2 border-b border-slate-100">
+                <i class="fa-solid fa-vault text-purple-600 mr-2"></i> Bloco 1 - Patrimônio e Caixa
+            </h4>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between text-slate-600">
+                    <span>Capital Inicial Total (Aportes)</span>
+                    <span class="font-bold text-slate-800">R$ {{ "%.2f"|format(total_aporte) }}</span>
+                </div>
+                <div class="flex justify-between text-slate-600">
+                    <span>(-) Investimento Total (CAPEX)</span>
+                    <span class="text-red-500">- R$ {{ "%.2f"|format(total_capex) }}</span>
+                </div>
+                <div class="flex justify-between text-slate-600">
+                    <span>(+) Lucros Acumulados (Histórico)</span>
+                    <span class="text-green-600">+ R$ {{ "%.2f"|format(lucro_acumulado) }}</span>
+                </div>
+                <div class="flex justify-between font-black text-lg pt-3 border-t border-slate-100 text-purple-800">
+                    <span>= Caixa Atual Real</span>
+                    <span>R$ {{ "%.2f"|format(caixa_atual) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg border border-slate-200 p-6">
+            <h4 class="text-sm font-bold text-slate-800 uppercase flex items-center mb-4 pb-2 border-b border-slate-100">
+                <i class="fa-solid fa-seedling text-emerald-600 mr-2"></i> Bloco 2 - Sustentação
+            </h4>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between text-slate-600">
+                    <span>Lucro Operacional do Mês</span>
+                    <span class="font-bold {{ 'text-green-600' if lucro >= 0 else 'text-red-600' }}">R$ {{ "%.2f"|format(lucro) }}</span>
+                </div>
+                <div class="flex justify-between text-slate-600">
+                    <span>Lucro Acumulado Total</span>
+                    <span class="font-bold text-slate-800">R$ {{ "%.2f"|format(lucro_acumulado) }}</span>
+                </div>
+                <div class="flex justify-between text-slate-600">
+                    <span>Payback do Investimento</span>
+                    <span class="font-bold text-blue-600">{{ "%.1f"|format(payback_percentual) }}%</span>
+                </div>
+                <div class="flex justify-between items-center pt-3 border-t border-slate-100 mt-1">
+                    <span class="font-bold text-slate-700">Status da Operação:</span>
+                    {% if is_sustentavel %}
+                        <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-green-200"><i class="fa-solid fa-check-circle mr-1"></i> Sustentável</span>
+                    {% else %}
+                        <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-red-200"><i class="fa-solid fa-xmark-circle mr-1"></i> Déficit</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <div id="modalInsumos" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden z-[80] flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
         <div class="p-5 border-b flex justify-between items-center bg-slate-50">
@@ -437,9 +497,9 @@
 </div>
 
 <div id="modalConfigFinanceira" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden z-[70] flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-        <div class="sticky top-0 bg-white p-6 border-b z-10 flex justify-between items-center">
-            <h3 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-sliders mr-2 text-blue-600"></i> Parâmetros Financeiros</h3>
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white p-6 border-b z-10 flex justify-between items-center shadow-sm">
+            <h3 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-sliders mr-2 text-blue-600"></i> Parâmetros Financeiros & Patrimônio</h3>
             <button type="button" onclick="document.getElementById('modalConfigFinanceira').classList.add('hidden')" class="text-slate-400 hover:text-red-500 text-xl transition"><i class="fa-solid fa-times"></i></button>
         </div>
 
@@ -520,10 +580,62 @@
                 </div>
             </div>
 
-            <div class="mt-8 pt-4 border-t flex gap-3 justify-end">
+            <div class="mt-8 border-t border-slate-200 pt-6">
+                <h4 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 border-b pb-1"><i class="fa-solid fa-vault text-slate-400 mr-1"></i> Gestão Patrimonial (Aportes e CAPEX)</h4>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-4">
+                        <div class="bg-purple-50 p-4 rounded-lg border border-purple-100 shadow-inner">
+                            <h5 class="text-xs font-bold text-purple-800 mb-3 uppercase">Capital Inicial (Aportes)</h5>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-purple-900 mb-1">Aporte - Erick (R$)</label>
+                                    <input type="number" step="0.01" name="aporte_erick" value="{{ '%.2f'|format(config.aporte_erick) }}" class="w-full border border-purple-200 p-2 rounded text-sm outline-none focus:border-purple-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-purple-900 mb-1">Aporte - Andrei (R$)</label>
+                                    <input type="number" step="0.01" name="aporte_andrei" value="{{ '%.2f'|format(config.aporte_andrei) }}" class="w-full border border-purple-200 p-2 rounded text-sm outline-none focus:border-purple-500">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-inner">
+                            <h5 class="text-xs font-bold text-slate-700 mb-3 uppercase">Investimentos Iniciais (CAPEX)</h5>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-600 mb-1">Produtos Iniciais (Estoque) (R$)</label>
+                                    <input type="number" step="0.01" name="capex_produtos" value="{{ '%.2f'|format(config.capex_produtos) }}" class="w-full border border-slate-300 p-1.5 rounded text-sm outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-600 mb-1">Ferramentas (R$)</label>
+                                    <input type="number" step="0.01" name="capex_ferramentas" value="{{ '%.2f'|format(config.capex_ferramentas) }}" class="w-full border border-slate-300 p-1.5 rounded text-sm outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-600 mb-1">Estrutura (Reforma/Eqp) (R$)</label>
+                                    <input type="number" step="0.01" name="capex_estrutura" value="{{ '%.2f'|format(config.capex_estrutura) }}" class="w-full border border-slate-300 p-1.5 rounded text-sm outline-none focus:border-blue-500">
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-600 mb-1">Marketing In. (R$)</label>
+                                        <input type="number" step="0.01" name="capex_marketing" value="{{ '%.2f'|format(config.capex_marketing) }}" class="w-full border border-slate-300 p-1.5 rounded text-sm outline-none focus:border-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-slate-600 mb-1">Outros Ativos (R$)</label>
+                                        <input type="number" step="0.01" name="capex_outros" value="{{ '%.2f'|format(config.capex_outros) }}" class="w-full border border-slate-300 p-1.5 rounded text-sm outline-none focus:border-blue-500">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 pt-4 border-t flex gap-3 justify-end sticky bottom-0 bg-white p-4 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] rounded-b-xl">
                 <button type="button" onclick="document.getElementById('modalConfigFinanceira').classList.add('hidden')" class="px-6 py-2 bg-gray-200 text-slate-700 font-bold rounded-lg hover:bg-gray-300 transition">Cancelar</button>
                 <button type="submit" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-lg hover:bg-blue-700 transition flex items-center gap-2">
-                    <i class="fa-solid fa-save"></i> Salvar Configurações
+                    <i class="fa-solid fa-save"></i> Salvar Tudo
                 </button>
             </div>
         </form>
