@@ -138,6 +138,7 @@ def processar_fechamentos_pendentes():
             
             fat_liq = sum(a.valor_liquido if a.valor_liquido else a.valor_cobrado for a in concluidos)
             custo_prod = sum(a.custo_total_produtos for a in concluidos)
+            custo_var_extras = sum(a.gastos_extras for a in concluidos)
             
             config = ConfiguracaoFinanceira.query.first()
             custos_fixos_base = config.aluguel_iptu + config.pro_labore + config.agua_energia_base + config.internet_telefone + config.mei_impostos + config.marketing + config.seguro if config else 0
@@ -147,7 +148,7 @@ def processar_fechamentos_pendentes():
             fechamento_ant_ant = FechamentoMensal.query.filter_by(mes_ano=mes_ant_ant_str).first()
             deficit_ant = abs(fechamento_ant_ant.deficit_acumulado) if fechamento_ant_ant and fechamento_ant_ant.deficit_acumulado < 0 else 0
             
-            custos_totais = custos_fixos_base + custo_prod + deficit_ant
+            custos_totais = custos_fixos_base + custo_prod + custo_var_extras + deficit_ant
             lucro_real = fat_liq - custos_totais
             novo_deficit = lucro_real if lucro_real < 0 else 0
             
@@ -329,8 +330,11 @@ def financeiro():
     
     faturamento_bruto = sum(a.valor_cobrado for a in concluidos)
     faturamento_liquido = sum(a.valor_liquido if a.valor_liquido else a.valor_cobrado for a in concluidos)
+    total_taxas_pagamento = faturamento_bruto - faturamento_liquido
     
     custo_produtos_total = sum(a.custo_total_produtos for a in concluidos)
+    total_outras_variaveis = sum(a.gastos_extras for a in concluidos)
+    total_custos_variaveis = custo_produtos_total + total_outras_variaveis
     
     custos_fixos_base = config.aluguel_iptu + config.pro_labore + config.agua_energia_base + config.internet_telefone + config.mei_impostos + config.marketing + config.seguro
     
@@ -339,11 +343,11 @@ def financeiro():
     
     custos_fixos_total = custos_fixos_base + deficit_anterior
     
-    lucro_estimado = faturamento_liquido - custo_produtos_total - custos_fixos_total
-    ticket_medio = faturamento_bruto / len(concluidos) if concluidos else 0
-    
-    margem_contribuicao_total = faturamento_liquido - custo_produtos_total
+    margem_contribuicao_total = faturamento_liquido - total_custos_variaveis
     margem_media = margem_contribuicao_total / len(concluidos) if concluidos else 0
+    
+    lucro_estimado = margem_contribuicao_total - custos_fixos_total
+    ticket_medio = faturamento_bruto / len(concluidos) if concluidos else 0
     
     if margem_media > 0:
         meta_motos = math.ceil(custos_fixos_total / margem_media)
@@ -388,10 +392,14 @@ def financeiro():
     return render_template('financeiro.html', 
                            faturamento_bruto=faturamento_bruto,
                            faturamento_liquido=faturamento_liquido,
+                           total_taxas_pagamento=total_taxas_pagamento,
                            custos_produtos=custo_produtos_total, 
+                           total_outras_variaveis=total_outras_variaveis,
+                           total_custos_variaveis=total_custos_variaveis,
                            custos_fixos=custos_fixos_total,
                            lucro=lucro_estimado,
                            margem_contribuicao_total=margem_contribuicao_total,
+                           margem_media=margem_media,
                            ticket_medio=ticket_medio,
                            qtd_servicos=total_motos_ciclo,
                            servicos=servicos,
