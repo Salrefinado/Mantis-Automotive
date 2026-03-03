@@ -48,14 +48,14 @@
     <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-emerald-500">
         <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">Margem de Contribuição</p>
         <p class="text-2xl font-bold text-emerald-600 mt-1">R$ {{ "%.2f"|format(margem_contribuicao_total) }}</p>
-        <p class="text-[10px] text-slate-500 mt-1">Rec. Líquida (-) Custos Variáveis (R$ {{ "%.2f"|format(custos_produtos) }})</p>
+        <p class="text-[10px] text-slate-500 mt-1">Rec. Líquida (-) Custos Variáveis</p>
     </div>
 
     <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-green-500 relative overflow-hidden">
         <div class="absolute right-0 top-0 opacity-10 text-5xl mt-2 mr-2"><i class="fa-solid fa-sack-dollar"></i></div>
         <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">Lucro Operacional</p>
         <p class="text-2xl font-bold {{ 'text-green-600' if lucro >= 0 else 'text-red-600' }} mt-1">R$ {{ "%.2f"|format(lucro) }}</p>
-        <p class="text-[10px] text-slate-500 mt-1">Margem (-) Custos Fixos (R$ {{ "%.2f"|format(custos_fixos) }})</p>
+        <p class="text-[10px] text-slate-500 mt-1">Margem (-) Custos Fixos</p>
     </div>
 </div>
 
@@ -67,8 +67,12 @@
             <span class="font-mono text-lg text-blue-300">R$ {{ "%.2f"|format(ticket_medio) }}</span>
         </div>
         <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
-            <span class="text-sm text-slate-300">Motos Concluídas/Retiradas</span>
+            <span class="text-sm text-slate-300">Quantidade total de motos</span>
             <span class="font-mono text-lg text-purple-300">{{ qtd_servicos }}</span>
+        </div>
+        <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+            <span class="text-sm text-slate-300">Margem média por moto</span>
+            <span class="font-mono text-lg text-emerald-300">R$ {{ "%.2f"|format(margem_media) }}</span>
         </div>
         
         <div class="mt-6 pt-4 border-t border-slate-700">
@@ -213,6 +217,173 @@
     </div>
 </div>
 
+<div class="mb-12">
+    <div class="flex items-center gap-3 mb-4">
+        <div class="bg-blue-100 p-3 rounded-lg"><i class="fa-solid fa-chart-bar text-2xl text-blue-700"></i></div>
+        <div>
+            <h3 class="text-2xl font-black text-slate-800 tracking-tight">Resumo Consolidado do Mês</h3>
+            <p class="text-sm text-slate-500">Visão macro financeira do ciclo atual</p>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-2">
+            
+            <div class="p-6 lg:border-r border-slate-200">
+                
+                <div class="mb-6">
+                    <h4 class="text-sm font-bold text-slate-800 uppercase flex items-center mb-3">
+                        <span class="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center mr-2 text-xs">1</span> 
+                        Receita
+                    </h4>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between text-slate-600">
+                            <span>Receita Bruta Total</span>
+                            <span>R$ {{ "%.2f"|format(faturamento_bruto) }}</span>
+                        </div>
+                        <div class="flex justify-between text-red-500 border-b border-slate-100 pb-2">
+                            <span>(-) Taxas de Pagamento</span>
+                            <span>- R$ {{ "%.2f"|format(total_taxas_pagamento) }}</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-indigo-700 pt-1">
+                            <span>= Receita Líquida Total</span>
+                            <span>R$ {{ "%.2f"|format(faturamento_liquido) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h4 class="text-sm font-bold text-slate-800 uppercase flex items-center mb-3">
+                        <span class="bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center mr-2 text-xs">2</span> 
+                        Custos Variáveis
+                    </h4>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between text-slate-600">
+                            <span>Total Produtos Utilizados</span>
+                            <span>R$ {{ "%.2f"|format(custos_produtos) }}</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600 border-b border-slate-100 pb-2">
+                            <span>Total Outras Variáveis (Comissões/Extras)</span>
+                            <span>R$ {{ "%.2f"|format(total_outras_variaveis) }}</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-red-600 pt-1">
+                            <span>= Total Custos Variáveis</span>
+                            <span>- R$ {{ "%.2f"|format(total_custos_variaveis) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
+                    <h4 class="text-sm font-bold text-slate-800 uppercase flex items-center mb-3">
+                        <span class="bg-emerald-600 text-white w-6 h-6 rounded-full flex items-center justify-center mr-2 text-xs">3</span> 
+                        Margem de Contribuição
+                    </h4>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between text-slate-600">
+                            <span>Receita Líquida</span>
+                            <span>R$ {{ "%.2f"|format(faturamento_liquido) }}</span>
+                        </div>
+                        <div class="flex justify-between text-red-500 border-b border-emerald-200 pb-2">
+                            <span>(-) Custos Variáveis</span>
+                            <span>- R$ {{ "%.2f"|format(total_custos_variaveis) }}</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-emerald-700 text-lg pt-1">
+                            <span>= Margem de Contrib. Total</span>
+                            <span>R$ {{ "%.2f"|format(margem_contribuicao_total) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="p-6 bg-slate-50">
+                
+                <div class="mb-6">
+                    <h4 class="text-sm font-bold text-slate-800 uppercase flex items-center mb-3">
+                        <span class="bg-slate-600 text-white w-6 h-6 rounded-full flex items-center justify-center mr-2 text-xs">4</span> 
+                        Custos Fixos (Mensais)
+                    </h4>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between text-slate-600">
+                            <span>Aluguel + IPTU</span>
+                            <span>R$ {{ "%.2f"|format(config.aluguel_iptu) }}</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600">
+                            <span>Pró-labore</span>
+                            <span>R$ {{ "%.2f"|format(config.pro_labore) }}</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600">
+                            <span>Água/Energia (base)</span>
+                            <span>R$ {{ "%.2f"|format(config.agua_energia_base) }}</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600">
+                            <span>Internet/Telefone</span>
+                            <span>R$ {{ "%.2f"|format(config.internet_telefone) }}</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600">
+                            <span>MEI / Impostos Fixos</span>
+                            <span>R$ {{ "%.2f"|format(config.mei_impostos) }}</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600">
+                            <span>Marketing Fixo</span>
+                            <span>R$ {{ "%.2f"|format(config.marketing) }}</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600">
+                            <span>Seguro</span>
+                            <span>R$ {{ "%.2f"|format(config.seguro) }}</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600 border-b border-slate-200 pb-2">
+                            <span>Outros Fixos (Déficit Anterior)</span>
+                            <span>R$ {{ "%.2f"|format(deficit_anterior) }}</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-slate-700 pt-1">
+                            <span>= Total Custos Fixos</span>
+                            <span>- R$ {{ "%.2f"|format(custos_fixos) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="{{ 'bg-green-100 border border-green-200' if lucro >= 0 else 'bg-red-100 border border-red-200' }} p-5 rounded-lg">
+                    <h4 class="text-sm font-bold text-slate-800 uppercase flex items-center mb-3">
+                        <span class="{{ 'bg-green-600' if lucro >= 0 else 'bg-red-600' }} text-white w-6 h-6 rounded-full flex items-center justify-center mr-2 text-xs">5</span> 
+                        Resultado Final
+                    </h4>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between text-slate-700">
+                            <span>Margem de Contribuição Total</span>
+                            <span>R$ {{ "%.2f"|format(margem_contribuicao_total) }}</span>
+                        </div>
+                        <div class="flex justify-between text-slate-700 border-b {{ 'border-green-300' if lucro >= 0 else 'border-red-300' }} pb-2">
+                            <span>(-) Custos Fixos</span>
+                            <span>- R$ {{ "%.2f"|format(custos_fixos) }}</span>
+                        </div>
+                        <div class="flex justify-between font-black text-xl pt-2 {{ 'text-green-800' if lucro >= 0 else 'text-red-800' }}">
+                            <span>= Lucro Operacional</span>
+                            <span>R$ {{ "%.2f"|format(lucro) }}</span>
+                        </div>
+                        
+                        <div class="mt-4 pt-4 border-t {{ 'border-green-300' if lucro >= 0 else 'border-red-300' }} opacity-70">
+                            <p class="text-[10px] font-bold text-slate-600 uppercase mb-2">Se for regime Lucro Real:</p>
+                            <div class="flex justify-between text-slate-600 text-xs">
+                                <span>(-) IRPJ</span>
+                                <span>- R$ 0,00</span>
+                            </div>
+                            <div class="flex justify-between text-slate-600 text-xs pb-1 border-b {{ 'border-green-300' if lucro >= 0 else 'border-red-300' }}">
+                                <span>(-) CSLL</span>
+                                <span>- R$ 0,00</span>
+                            </div>
+                            <div class="flex justify-between font-bold text-slate-800 text-sm pt-1">
+                                <span>= Lucro Líquido Final</span>
+                                <span>R$ {{ "%.2f"|format(lucro) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
 <div id="modalInsumos" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden z-[80] flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
         <div class="p-5 border-b flex justify-between items-center bg-slate-50">
