@@ -39,7 +39,8 @@
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% for agenda in lista_agendamentos %}
         <div class="bg-white rounded-xl shadow-md border-l-4 
-            {% if agenda.status == 'Lavagem Concluída' %}border-green-500
+            {% if agenda.status == 'Retirado' %}border-purple-500 bg-slate-50 opacity-80
+            {% elif agenda.status == 'Lavagem Concluída' %}border-green-500
             {% elif agenda.status == 'Em Lavagem' %}border-blue-500
             {% elif agenda.status == 'Cancelado' %}border-red-500 opacity-60 bg-gray-50
             {% else %}border-slate-400{% endif %} 
@@ -53,7 +54,7 @@
                         </div>
                         <p class="text-slate-500 text-sm font-mono flex items-center gap-1">
                             {{ agenda.moto.modelo }} 
-                            <span class="text-xs bg-slate-100 px-1 rounded">{{ agenda.moto.placa }}</span>
+                            <span class="text-xs bg-slate-100 px-1 rounded border border-slate-200">{{ agenda.moto.placa }}</span>
                         </p>
                         <p class="text-xs text-blue-600 font-bold mt-1">
                             {{ agenda.tipo_servico }}
@@ -61,16 +62,26 @@
                                 <span class="ml-1 text-green-600 bg-green-50 px-1 rounded border border-green-200">-10% OFF</span>
                             {% endif %}
                         </p>
+                        {% if agenda.forma_pagamento_prevista %}
+                        <p class="text-[10px] text-slate-400 mt-1 uppercase font-semibold">
+                            Pgto: {{ agenda.forma_pagamento_prevista }} {% if agenda.forma_pagamento_prevista == 'Credito Parcelado' %}({{ agenda.parcelas }}x){% endif %}
+                        </p>
+                        {% endif %}
                     </div>
                     
-                    <div class="text-right">
+                    <div class="text-right flex flex-col items-end">
                         <span class="block text-xl font-bold text-slate-800">{{ agenda.data_agendada.strftime('%H:%M') }}</span>
-                        <span class="text-[10px] uppercase font-bold tracking-wide text-slate-500">{{ agenda.status }}</span>
+                        <span class="text-[10px] uppercase font-bold tracking-wide 
+                            {% if agenda.status == 'Retirado' %}text-purple-600 bg-purple-100 px-2 py-0.5 rounded
+                            {% elif agenda.status == 'Lavagem Concluída' %}text-green-600 bg-green-100 px-2 py-0.5 rounded
+                            {% else %}text-slate-500{% endif %} mt-1">
+                            {{ agenda.status }}
+                        </span>
                     </div>
                 </div>
 
                 <div class="flex justify-end gap-3 mb-3 text-slate-400 text-sm border-t border-slate-100 pt-2 mt-2">
-                    {% if agenda.status != 'Cancelado' and agenda.status != 'Lavagem Concluída' %}
+                    {% if agenda.status not in ['Cancelado', 'Lavagem Concluída', 'Retirado'] %}
                     <button onclick="abrirModalEdicao('{{ agenda.id }}', '{{ agenda.data_agendada.strftime('%Y-%m-%d') }}', '{{ agenda.data_agendada.strftime('%H:%M') }}')" class="hover:text-blue-600" title="Editar Data/Hora">
                         <i class="fa-solid fa-pen"></i>
                     </button>
@@ -89,15 +100,25 @@
                     {% if agenda.status == 'Agendado' %}
                         <button onclick="abrirModalStatus('{{ agenda.id }}', 'Em Lavagem', `{{ agenda.cliente.preferencias|replace('\n', ' ')|replace('`', '') if agenda.cliente.preferencias else '' }}`)" 
                                 class="flex-1 bg-blue-50 text-blue-700 py-2 px-3 rounded text-center text-sm font-semibold hover:bg-blue-100 border border-blue-200 whitespace-nowrap transition">
-                            <i class="fa-solid fa-soap mr-1"></i> Iniciar
+                            <i class="fa-solid fa-soap mr-1"></i> Iniciar Lavagem
                         </button>
+                    
                     {% elif agenda.status == 'Em Lavagem' %}
                         <button onclick="abrirModalStatus('{{ agenda.id }}', 'Lavagem Concluída')" class="flex-1 bg-green-50 text-green-700 py-2 px-3 rounded text-center text-sm font-semibold hover:bg-green-100 border border-green-200 whitespace-nowrap transition">
-                            <i class="fa-solid fa-flag-checkered mr-1"></i> Lavagem Finalizada
+                            <i class="fa-solid fa-flag-checkered mr-1"></i> Finalizar Lavagem
                         </button>
-                    {% else %}
+                    
+                    {% elif agenda.status == 'Lavagem Concluída' %}
+                        <button onclick="abrirModalRetirada('{{ agenda.id }}', '{{ agenda.valor_cobrado }}', '{{ agenda.forma_pagamento_prevista }}', '{{ agenda.parcelas }}')" class="flex-1 bg-slate-800 text-white py-2 px-3 rounded text-center text-sm font-semibold hover:bg-black shadow-md transition">
+                            <i class="fa-solid fa-hand-holding-dollar mr-1"></i> Retirar / Pagar
+                        </button>
+                        <button onclick="abrirModalMidia('{{ agenda.id }}')" class="flex-none bg-purple-50 text-purple-700 py-2 px-3 rounded text-center text-sm font-semibold hover:bg-purple-100 border border-purple-200" title="Anexar Mídia">
+                            <i class="fa-solid fa-camera"></i>
+                        </button>
+                    
+                    {% elif agenda.status == 'Retirado' %}
                         <button onclick="abrirModalMidia('{{ agenda.id }}')" class="flex-1 bg-purple-50 text-purple-700 py-2 px-3 rounded text-center text-sm font-semibold hover:bg-purple-100 border border-purple-200">
-                            <i class="fa-solid fa-camera mr-1"></i> Mídia
+                            <i class="fa-solid fa-camera mr-1"></i> Adicionar Mídia
                         </button>
                     {% endif %}
                     
@@ -161,7 +182,7 @@
                     </div>
                 </div>
 
-                <div class="mb-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <div class="mb-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
                     <label class="block text-sm font-bold text-slate-700 mb-2">Serviço</label>
                     <select id="selectServico" name="tipo_servico" class="w-full border rounded p-2 mb-3 bg-white" onchange="atualizarPreco()">
                         <option value="manual">Manual / Outro</option>
@@ -169,7 +190,23 @@
                     
                     <div class="relative">
                         <span class="absolute left-3 top-2 text-slate-400 font-bold">R$</span>
-                        <input type="number" step="0.01" id="inputValor" name="valor" class="w-full border p-2 pl-10 rounded font-bold text-lg text-slate-800" placeholder="0.00" required>
+                        <input type="number" step="0.01" id="inputValor" name="valor" class="w-full border p-2 pl-10 rounded font-bold text-lg text-slate-800" placeholder="0.00" oninput="validarParcelamentoMinimo()" required>
+                    </div>
+                </div>
+                
+                <div class="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <label class="block text-sm font-bold text-blue-800 mb-2">Forma de Pagamento (Previsão)</label>
+                    <select name="forma_pagamento_prevista" id="selectPagamentoPrevisto" class="w-full border border-blue-200 p-2 rounded mb-2 bg-white text-sm" onchange="verificarParcelamento(this.value, 'parcelas_previstas_container', 'selectPagamentoPrevisto')">
+                        <option value="Dinheiro">Dinheiro</option>
+                        <option value="PIX" selected>PIX</option>
+                        <option value="Debito">Cartão de Débito</option>
+                        <option value="Credito A Vista">Cartão de Crédito (À Vista)</option>
+                        <option value="Credito Parcelado">Cartão de Crédito (Parcelado)</option>
+                    </select>
+                    <div id="parcelas_previstas_container" class="hidden mt-3 pt-3 border-t border-blue-200">
+                        <label class="block text-xs font-bold text-blue-800 mb-1">Nº de Parcelas</label>
+                        <input type="number" name="parcelas" min="1" max="12" value="1" class="w-full border border-blue-200 p-2 rounded text-sm">
+                        <p class="text-[10px] text-blue-600 mt-1 italic">Mínimo para parcelar: R$ {{ "%.2f"|format(config.minimo_parcelamento) if config else "300.00" }}</p>
                     </div>
                 </div>
 
@@ -220,6 +257,41 @@
     </div>
 </div>
 
+<div id="modalRetirada" class="fixed inset-0 bg-gray-900 bg-opacity-70 hidden z-[60] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 border-t-4 border-slate-800">
+        <h3 class="text-xl font-bold text-slate-800 mb-1">Confirmar Retirada</h3>
+        <p class="text-sm text-slate-500 mb-4">Confirme o pagamento para dar baixa e calcular as taxas do cartão.</p>
+        
+        <form id="formRetirada" method="POST" action="">
+            <div class="mb-4">
+                <label class="block text-sm font-bold text-slate-700 mb-1">Valor Final Cobrado (R$)</label>
+                <input type="text" id="retiradaValorShow" class="w-full border p-2 rounded bg-slate-100 font-bold text-slate-600 text-lg outline-none" readonly>
+            </div>
+            
+            <div class="mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <label class="block text-sm font-bold text-slate-700 mb-2">Forma de Pagamento Realizada</label>
+                <select name="forma_pagamento_real" id="selectPagamentoReal" class="w-full border p-2 rounded bg-white text-sm" onchange="verificarParcelamento(this.value, 'parcelas_reais_container', 'selectPagamentoReal')">
+                    <option value="Dinheiro">Dinheiro</option>
+                    <option value="PIX">PIX</option>
+                    <option value="Debito">Cartão de Débito</option>
+                    <option value="Credito A Vista">Cartão de Crédito (À Vista)</option>
+                    <option value="Credito Parcelado">Cartão de Crédito (Parcelado)</option>
+                </select>
+            </div>
+            
+            <div id="parcelas_reais_container" class="hidden mb-6 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <label class="block text-xs font-bold text-slate-500 mb-1">Nº de Parcelas (Feitas na Maquininha)</label>
+                <input type="number" name="parcelas_reais" id="inputParcelasReais" min="1" max="12" value="1" class="w-full border p-2 rounded text-sm">
+            </div>
+            
+            <div class="flex gap-3 mt-6">
+                <button type="button" onclick="document.getElementById('modalRetirada').classList.add('hidden')" class="flex-1 py-3 bg-gray-200 text-slate-600 rounded-lg font-bold hover:bg-gray-300 transition">Cancelar</button>
+                <button type="submit" class="flex-1 py-3 bg-slate-800 text-white rounded-lg font-bold shadow-lg hover:bg-black transition"><i class="fa-solid fa-check mr-1"></i> Confirmar Baixa</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="modalNovaMoto" class="fixed inset-0 bg-black bg-opacity-70 hidden z-[60] flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
         <h3 class="text-lg font-bold text-slate-800 mb-4">Adicionar Moto</h3>
@@ -266,7 +338,7 @@
             </div>
             
             <div class="flex gap-3">
-                <button type="button" onclick="document.getElementById('modalStatusTempo').classList.add('hidden')" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-lg font-bold">Cancelar</button>
+                <button type="button" onclick="document.getElementById('modalStatusTempo').classList.add('hidden')" class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-lg font-bold hover:bg-slate-200">Cancelar</button>
                 <button type="submit" class="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold shadow-lg hover:bg-blue-700">Confirmar</button>
             </div>
         </form>
@@ -287,8 +359,8 @@
                 <input type="time" name="data_hora" id="edit_hora" class="w-full border p-2 rounded" required>
             </div>
             <div class="flex gap-2">
-                <button type="button" onclick="document.getElementById('modalEdicao').classList.add('hidden')" class="flex-1 bg-gray-200 py-2 rounded">Cancelar</button>
-                <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded">Salvar</button>
+                <button type="button" onclick="document.getElementById('modalEdicao').classList.add('hidden')" class="flex-1 bg-gray-200 py-2 rounded font-bold hover:bg-gray-300">Cancelar</button>
+                <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700">Salvar</button>
             </div>
         </form>
     </div>
@@ -325,13 +397,73 @@
 <script>
     document.getElementById('inputDataHoje').valueAsDate = new Date();
     const TABELA_PRECOS = {{ tabela_precos | tojson }};
+    const MINIMO_PARCELAMENTO = {{ config.minimo_parcelamento if config else 300.0 }};
     let CLIENTE_SELECIONADO_ID = null;
     
     function abrirModalAgendamento() { document.getElementById('modalAgendamento').classList.remove('hidden'); }
     function fecharModalAgendamento() { document.getElementById('modalAgendamento').classList.add('hidden'); }
     function alternarCadastroCliente() { $('#formAgendamento').toggleClass('hidden'); $('#formCadastroRapido').toggleClass('hidden'); }
     
-    // Abrir Modal Nova Moto
+    // --- LÓGICA DE PAGAMENTO E PARCELAMENTO ---
+    function verificarParcelamento(formaPagamento, containerId, selectId) {
+        const container = document.getElementById(containerId);
+        let valorRef = 0;
+        
+        // Se for o modal de previsão, pega o valor do input de serviço
+        if (selectId === 'selectPagamentoPrevisto') {
+            valorRef = parseFloat(document.getElementById('inputValor').value) || 0;
+        } else {
+            // Se for o modal de retirada, pega o valor fixado no modal
+            const valorStr = document.getElementById('retiradaValorShow').value.replace('R$ ', '');
+            valorRef = parseFloat(valorStr) || 0;
+        }
+        
+        if (formaPagamento === 'Credito Parcelado') {
+            if (valorRef < MINIMO_PARCELAMENTO) {
+                alert(`Para parcelar, o serviço precisa ser no mínimo R$ ${MINIMO_PARCELAMENTO.toFixed(2)}.`);
+                document.getElementById(selectId).value = 'Credito A Vista';
+                container.classList.add('hidden');
+            } else {
+                container.classList.remove('hidden');
+            }
+        } else {
+            container.classList.add('hidden');
+        }
+    }
+
+    function validarParcelamentoMinimo() {
+        const select = document.getElementById('selectPagamentoPrevisto');
+        if (select.value === 'Credito Parcelado') {
+            verificarParcelamento('Credito Parcelado', 'parcelas_previstas_container', 'selectPagamentoPrevisto');
+        }
+    }
+
+    function abrirModalRetirada(id, valor, formaPrevista, parcelas) {
+        document.getElementById('formRetirada').action = "/atualizar_status/" + id + "/Retirado";
+        document.getElementById('retiradaValorShow').value = parseFloat(valor).toFixed(2);
+        
+        const selectPagamentoReal = document.getElementById('selectPagamentoReal');
+        const parcelasInput = document.getElementById('inputParcelasReais');
+        const containerParcelas = document.getElementById('parcelas_reais_container');
+        
+        if (formaPrevista && formaPrevista !== 'None' && formaPrevista !== '') {
+            selectPagamentoReal.value = formaPrevista;
+        } else {
+            selectPagamentoReal.value = 'PIX';
+        }
+        
+        if (selectPagamentoReal.value === 'Credito Parcelado') {
+            containerParcelas.classList.remove('hidden');
+            parcelasInput.value = (parcelas && parcelas !== 'None') ? parcelas : 1;
+        } else {
+            containerParcelas.classList.add('hidden');
+            parcelasInput.value = 1;
+        }
+        
+        document.getElementById('modalRetirada').classList.remove('hidden');
+    }
+    // ------------------------------------------
+
     function abrirModalNovaMoto() {
         if (!CLIENTE_SELECIONADO_ID) {
             alert("Selecione um cliente primeiro.");
@@ -341,7 +473,6 @@
         document.getElementById('modalNovaMoto').classList.remove('hidden');
     }
 
-    // Salvar Nova Moto via AJAX
     $('#formNovaMoto').on('submit', function(e) {
         e.preventDefault();
         $.ajax({
@@ -350,7 +481,6 @@
             data: $(this).serialize(),
             success: function(response) {
                 if(response.success) {
-                    // Adiciona a nova moto ao select e seleciona ela
                     var selectMoto = $('#selectMoto');
                     var moto = response.moto;
                     var option = new Option(moto.modelo + ' (' + moto.categoria + ')', moto.id, true, true);
@@ -368,7 +498,6 @@
         });
     });
 
-    // Função atualizada para receber e exibir preferências
     function abrirModalStatus(id, status, preferencias = '') {
         const modal = document.getElementById('modalStatusTempo');
         const form = document.getElementById('formAtualizarStatus');
@@ -377,8 +506,7 @@
         
         form.action = "/atualizar_status/" + id + "/" + status;
         
-        // Lógica para exibir aviso de preferências
-        if (status === 'Em Lavagem' && preferencias && preferencias.trim() !== '') {
+        if (status === 'Em Lavagem' && preferencias && preferencias.trim() !== '' && preferencias !== 'None') {
             avisoDiv.innerHTML = '<p class="font-bold mb-1"><i class="fa-solid fa-triangle-exclamation"></i> ATENÇÃO ÀS PREFERÊNCIAS:</p><p class="italic">"' + preferencias + '"</p>';
             avisoDiv.classList.remove('hidden');
         } else {
@@ -389,7 +517,7 @@
         if (status === 'Em Lavagem') {
             titulo.innerText = 'Iniciar Lavagem';
         } else if (status === 'Lavagem Concluída') {
-            titulo.innerText = 'Confirmar Lavagem Finalizada';
+            titulo.innerText = 'Finalizar Lavagem';
         } else {
             titulo.innerText = 'Atualizar Status';
         }
@@ -421,14 +549,17 @@
         const select = document.getElementById('selectServico'); 
         const inputValor = document.getElementById('inputValor'); 
         const opcao = select.options[select.selectedIndex]; 
-        if (opcao.dataset.valor) inputValor.value = opcao.dataset.valor; 
-        else inputValor.value = ''; 
+        if (opcao.dataset.valor) {
+            inputValor.value = opcao.dataset.valor; 
+        } else {
+            inputValor.value = ''; 
+        }
+        validarParcelamentoMinimo(); // Revalida a regra do cartão se o preço mudar
     }
     
     $(document).ready(function() {
         $('.select2-busca').select2({ width: '100%', placeholder: "Selecione..." });
         
-        // Select2 com AJAX e busca mínima de 1 caractere
         $('#selectCliente').select2({ 
             placeholder: "Busque por Nome ou Telefone",
             minimumInputLength: 1, 
@@ -448,8 +579,8 @@
         
         $('#selectCliente').on('select2:select', function (e) {
             var data = e.params.data; 
-            CLIENTE_SELECIONADO_ID = data.id; // Salva o ID globalmente
-            $('#btnNovaMoto').removeClass('hidden'); // Mostra botão de adicionar moto
+            CLIENTE_SELECIONADO_ID = data.id; 
+            $('#btnNovaMoto').removeClass('hidden'); 
 
             var selectMoto = $('#selectMoto'); 
             selectMoto.empty();
@@ -464,10 +595,7 @@
             } else {
                 selectMoto.append(new Option("Nenhuma moto cadastrada", ""));
             }
-
-            // Nota: O alerta de preferências via alert() foi removido pois agora aparece no modal de iniciar lavagem
             
-            // Alerta de Desconto
             if(data.qtd_descontos > 0) {
                 alert(`✨ CLIENTE VIP: Possui ${data.qtd_descontos} desconto(s) disponível(is)! 10% será aplicado.`);
             }
@@ -478,7 +606,6 @@
             var categoria = selectedOpt.data('categoria') || 'Naked'; 
             var selectServico = document.getElementById('selectServico'); 
             
-            // Limpa e recria
             selectServico.innerHTML = '<option value="manual">Manual / Outro</option>';
             var opcoes = TABELA_PRECOS[categoria];
             if (opcoes) {
@@ -503,7 +630,6 @@
                         var newOption = new Option(response.cliente.nome + ' - ' + response.cliente.telefone, response.cliente.id, true, true);
                         $('#selectCliente').append(newOption).trigger('change');
                         
-                        // Atualiza variável global para permitir adição de motos extras
                         CLIENTE_SELECIONADO_ID = response.cliente.id;
                         $('#btnNovaMoto').removeClass('hidden');
 
