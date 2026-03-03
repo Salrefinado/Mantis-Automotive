@@ -45,17 +45,17 @@
         <p class="text-[10px] text-slate-500 mt-1">Após descontar taxas de maquininha</p>
     </div>
 
-    <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-red-500">
-        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">Custos Totais</p>
-        <p class="text-2xl font-bold text-red-600 mt-1">R$ {{ "%.2f"|format(custos_produtos + custos_fixos) }}</p>
-        <p class="text-[10px] text-slate-500 mt-1">Produtos (R$ {{ "%.2f"|format(custos_produtos) }}) + Fixos (R$ {{ "%.2f"|format(custos_fixos) }})</p>
+    <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-emerald-500">
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">Margem de Contribuição</p>
+        <p class="text-2xl font-bold text-emerald-600 mt-1">R$ {{ "%.2f"|format(margem_contribuicao_total) }}</p>
+        <p class="text-[10px] text-slate-500 mt-1">Rec. Líquida (-) Custos Variáveis (R$ {{ "%.2f"|format(custos_produtos) }})</p>
     </div>
 
     <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-green-500 relative overflow-hidden">
         <div class="absolute right-0 top-0 opacity-10 text-5xl mt-2 mr-2"><i class="fa-solid fa-sack-dollar"></i></div>
-        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">Lucro Real Estimado</p>
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">Lucro Operacional</p>
         <p class="text-2xl font-bold {{ 'text-green-600' if lucro >= 0 else 'text-red-600' }} mt-1">R$ {{ "%.2f"|format(lucro) }}</p>
-        <p class="text-[10px] text-slate-500 mt-1">Líquido - Custos Totais</p>
+        <p class="text-[10px] text-slate-500 mt-1">Margem (-) Custos Fixos (R$ {{ "%.2f"|format(custos_fixos) }})</p>
     </div>
 </div>
 
@@ -168,9 +168,8 @@
                         <th class="p-4 text-center border-r border-slate-700">Pgto</th>
                         <th class="p-4 text-center border-r border-slate-700 text-green-400">Recebido (Líq)</th>
                         <th class="p-4 text-center border-r border-slate-700 text-red-300">Produtos</th>
-                        <th class="p-4 text-center border-r border-slate-700 text-red-300">Custo Fixo (Rateio)</th>
                         <th class="p-4 text-center border-r border-slate-700 text-red-300">Variáveis</th>
-                        <th class="p-4 text-right text-white">Lucro Real</th>
+                        <th class="p-4 text-right text-white">Margem de Contrib.</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -193,19 +192,16 @@
                         <td class="p-4 text-center text-red-500 border-r border-slate-100">
                             - R$ {{ "%.2f"|format(item.gasto_produtos) }}
                         </td>
-                        <td class="p-4 text-center text-red-500 border-r border-slate-100" title="Custo Fixo Total / Motos Lavadas">
-                            - R$ {{ "%.2f"|format(item.despesas_fixas_rateadas) }}
-                        </td>
                         <td class="p-4 text-center text-red-500 border-r border-slate-100">
                             - R$ {{ "%.2f"|format(item.despesas_variaveis) }}
                         </td>
-                        <td class="p-4 text-right font-bold text-base {{ 'text-green-600 bg-green-50' if item.lucro_estimado >= 0 else 'text-red-600 bg-red-50' }}">
-                            R$ {{ "%.2f"|format(item.lucro_estimado) }}
+                        <td class="p-4 text-right font-bold text-base {{ 'text-emerald-600 bg-emerald-50' if item.margem_contribuicao >= 0 else 'text-red-600 bg-red-50' }}">
+                            R$ {{ "%.2f"|format(item.margem_contribuicao) }}
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="9" class="p-10 text-center text-slate-400">
+                        <td colspan="8" class="p-10 text-center text-slate-400">
                             <i class="fa-solid fa-motorcycle text-4xl mb-3 opacity-20 block"></i>
                             Nenhuma lavagem concluída registrada neste ciclo ainda.
                         </td>
@@ -401,4 +397,3 @@
     }
 </script>
 {% endblock %}
-
