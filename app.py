@@ -517,9 +517,22 @@ def salvar_configuracao_financeira():
         config.capex_outros = float(request.form.get('capex_outros', config.capex_outros))
         
         db.session.commit()
-        flash('Configurações financeiras e patrimoniais atualizadas com sucesso!', 'success')
+        flash('Configurações atualizadas com sucesso!', 'success')
     except Exception as e:
         flash(f'Erro ao salvar configurações: {e}', 'error')
+    return redirect(url_for('financeiro'))
+
+@app.route('/restart_financeiro', methods=['POST'])
+def restart_financeiro():
+    try:
+        # Apaga todo o histórico de fechamentos, resetando o déficit acumulado, lucros e retiradas históricas.
+        # Os clientes e agendamentos (DRE Mensal) não são afetados.
+        db.session.query(FechamentoMensal).delete()
+        db.session.commit()
+        flash('Histórico financeiro resetado! Déficits e lucros passados foram zerados (Clientes mantidos).', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao resetar histórico: {e}', 'error')
     return redirect(url_for('financeiro'))
 
 @app.route('/atualizar_preco', methods=['POST'])
