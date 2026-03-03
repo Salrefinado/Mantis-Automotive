@@ -96,6 +96,7 @@
                     <tr class="text-slate-600 uppercase text-[10px] tracking-wider border-b border-slate-200">
                         <th class="p-3">Categoria</th>
                         <th class="p-3">Serviço</th>
+                        <th class="p-3 text-center">Insumos</th>
                         <th class="p-3">Valor (R$)</th>
                         <th class="p-3 text-center">Ação</th>
                     </tr>
@@ -110,6 +111,12 @@
                         </td>
                         <td class="p-3 font-medium text-slate-700 text-sm">
                             {{ servico.nome }}
+                        </td>
+                        <td class="p-3 text-center">
+                            {% set vinculados = servico.produtos_vinculados | map(attribute='id') | list %}
+                            <button type="button" onclick="abrirModalInsumos({{ servico.id }}, '{{ servico.nome }}', {{ vinculados | tojson }})" class="bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200 px-3 py-1.5 rounded text-xs font-bold transition shadow-sm flex items-center justify-center gap-1 mx-auto w-full max-w-[120px]">
+                                <i class="fa-solid fa-pump-soap"></i> Receita ({{ vinculados|length }})
+                            </button>
                         </td>
                         <td class="p-3">
                             <form action="{{ url_for('atualizar_preco') }}" method="POST" class="flex items-center gap-2">
@@ -130,7 +137,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" class="p-6 text-center text-slate-400 text-sm">
+                        <td colspan="5" class="p-6 text-center text-slate-400 text-sm">
                             Nenhum serviço cadastrado. O sistema criará os padrões ao reiniciar.
                         </td>
                     </tr>
@@ -207,6 +214,58 @@
                 </tbody>
             </table>
         </div>
+    </div>
+</div>
+
+<div id="modalInsumos" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden z-[80] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div class="p-5 border-b flex justify-between items-center bg-slate-50">
+            <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-clipboard-list text-indigo-600 mr-2"></i> Receita do Serviço: <span id="nomeServicoInsumo" class="text-indigo-700"></span></h3>
+            <button type="button" onclick="fecharModalInsumos()" class="text-slate-400 hover:text-red-500 text-xl transition"><i class="fa-solid fa-times"></i></button>
+        </div>
+        
+        <form action="{{ url_for('vincular_produtos_servico') }}" method="POST" class="flex flex-col flex-1 overflow-hidden">
+            <input type="hidden" name="servico_id" id="insumo_servico_id">
+            
+            <div class="p-5 overflow-y-auto flex-1 bg-slate-100">
+                <div class="bg-indigo-50 border border-indigo-200 p-3 rounded-lg mb-4 text-sm text-indigo-800 shadow-sm flex gap-3 items-start">
+                    <i class="fa-solid fa-circle-info mt-1"></i>
+                    <p>Selecione os produtos que são efetivamente gastos ao realizar esta lavagem. O sistema dará baixa automática no estoque e calculará o CMV no DRE <strong>apenas</strong> dos itens marcados aqui.</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {% for p in produtos_todos %}
+                    <label class="flex items-start p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:border-indigo-400 hover:shadow-md transition group">
+                        <div class="flex-shrink-0 mt-0.5">
+                            <input type="checkbox" name="produtos" value="{{ p.id }}" class="checkbox-insumo w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                        </div>
+                        <div class="ml-3 flex-1">
+                            <div class="text-sm font-bold text-slate-700 group-hover:text-indigo-700 transition">{{ p.nome }}</div>
+                            <div class="flex justify-between mt-1 items-center">
+                                <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">Gasto: {{ "%.1f"|format(p.gasto_medio_lavagem) }} {{ p.unidade_medida }}</span>
+                                <span class="text-[10px] font-bold {{ 'text-red-500' if p.estoque_atual <= 0 else 'text-green-600' }}">Estoque: {{ "%.1f"|format(p.estoque_atual) }}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-50 flex justify-between">
+                                <span>Custo por Dose:</span>
+                                <span class="font-bold text-slate-600">R$ {{ "%.2f"|format(p.custo_por_dose) }}</span>
+                            </div>
+                        </div>
+                    </label>
+                    {% else %}
+                    <div class="col-span-2 text-center text-slate-500 text-sm py-8 bg-white rounded-lg border border-dashed border-slate-300">
+                        Nenhum produto cadastrado no seu Stock ainda.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="p-4 border-t bg-white flex justify-end gap-3">
+                <button type="button" onclick="fecharModalInsumos()" class="px-5 py-2 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition text-sm">Cancelar</button>
+                <button type="submit" class="px-5 py-2 bg-indigo-600 text-white font-bold rounded-lg shadow-md hover:bg-indigo-700 transition text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-save"></i> Salvar Receita
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -310,14 +369,35 @@
         const total = parseFloat(inputValor) || 0;
         const metade = total / 2;
         
-        // Formatação simples para Moeda BRL
         const formatado = metade.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         
         document.getElementById('valorErick').innerText = formatado;
         document.getElementById('valorAndrei').innerText = formatado;
     }
     
-    // Executa ao carregar o modal/página para preencher os valores iniciais de quem já está salvo
     document.addEventListener('DOMContentLoaded', calcularSociedade);
+
+    // Funções do Modal de Insumos (Receita)
+    function abrirModalInsumos(id, nome, vinculados) {
+        document.getElementById('insumo_servico_id').value = id;
+        document.getElementById('nomeServicoInsumo').innerText = nome;
+        
+        // Limpa todos os checkboxes primeiro
+        document.querySelectorAll('.checkbox-insumo').forEach(cb => {
+            cb.checked = false;
+        });
+        
+        // Marca apenas os que já pertencem ao serviço
+        vinculados.forEach(v_id => {
+            let cb = document.querySelector(`.checkbox-insumo[value="${v_id}"]`);
+            if(cb) cb.checked = true;
+        });
+        
+        document.getElementById('modalInsumos').classList.remove('hidden');
+    }
+
+    function fecharModalInsumos() {
+        document.getElementById('modalInsumos').classList.add('hidden');
+    }
 </script>
 {% endblock %}
