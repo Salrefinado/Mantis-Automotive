@@ -4,6 +4,14 @@ from datetime import datetime
 db = SQLAlchemy()
 
 # ---------------------------
+# TABELA DE ASSOCIAÇÃO: SERVIÇO <-> PRODUTO
+# ---------------------------
+servico_produto_assoc = db.Table('servico_produto',
+    db.Column('servico_id', db.Integer, db.ForeignKey('servicos.id'), primary_key=True),
+    db.Column('produto_id', db.Integer, db.ForeignKey('produtos.id'), primary_key=True)
+)
+
+# ---------------------------
 # MODELO: CLIENTES
 # ---------------------------
 class Cliente(db.Model):
@@ -88,7 +96,7 @@ class Produto(db.Model):
         return 0.0
 
 # ---------------------------
-# MODELO: SERVIÇOS (Preços Editáveis)
+# MODELO: SERVIÇOS (Preços Editáveis e Receita de Produtos)
 # ---------------------------
 class Servico(db.Model):
     __tablename__ = 'servicos'
@@ -97,6 +105,10 @@ class Servico(db.Model):
     categoria = db.Column(db.String(50), nullable=False) # Ex: Naked, Sport
     nome = db.Column(db.String(100), nullable=False)     # Ex: Standard Naked
     valor = db.Column(db.Float, nullable=False)          # Ex: 50.00
+    
+    # Relacionamento com os Produtos (Receita do Serviço)
+    produtos_vinculados = db.relationship('Produto', secondary=servico_produto_assoc, lazy='subquery',
+        backref=db.backref('servicos', lazy=True))
 
 # ---------------------------
 # MODELO: AGENDAMENTOS
@@ -149,7 +161,7 @@ class MidiaAgendamento(db.Model):
     data_upload = db.Column(db.DateTime, default=datetime.utcnow)
 
 # ---------------------------
-# NOVO MODELO: CONFIGURAÇÃO FINANCEIRA (CUSTOS FIXOS)
+# MODELO: CONFIGURAÇÃO FINANCEIRA (CUSTOS FIXOS)
 # ---------------------------
 class ConfiguracaoFinanceira(db.Model):
     __tablename__ = 'configuracao_financeira'
@@ -175,7 +187,7 @@ class ConfiguracaoFinanceira(db.Model):
     capacidade_mensal = db.Column(db.Integer, default=40)
 
 # ---------------------------
-# NOVO MODELO: FECHAMENTO MENSAL (DRE)
+# MODELO: FECHAMENTO MENSAL (DRE)
 # ---------------------------
 class FechamentoMensal(db.Model):
     __tablename__ = 'fechamento_mensal'
