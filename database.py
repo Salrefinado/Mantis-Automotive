@@ -88,7 +88,7 @@ class Produto(db.Model):
         return 0.0
 
 # ---------------------------
-# NOVO MODELO: SERVIÇOS (Preços Editáveis)
+# MODELO: SERVIÇOS (Preços Editáveis)
 # ---------------------------
 class Servico(db.Model):
     __tablename__ = 'servicos'
@@ -123,6 +123,13 @@ class Agendamento(db.Model):
     custo_total_produtos = db.Column(db.Float, default=0.0)
     gastos_extras = db.Column(db.Float, default=0.0)
     
+    # --- NOVOS CAMPOS: FINANCEIRO E PAGAMENTO ---
+    forma_pagamento_prevista = db.Column(db.String(50), nullable=True)
+    forma_pagamento_real = db.Column(db.String(50), nullable=True)
+    parcelas = db.Column(db.Integer, default=1)
+    taxa_aplicada = db.Column(db.Float, default=0.0)
+    valor_liquido = db.Column(db.Float, nullable=True)
+    
     midias = db.relationship('MidiaAgendamento', backref='agendamento', lazy=True)
 
     @property
@@ -140,3 +147,29 @@ class MidiaAgendamento(db.Model):
     caminho_arquivo = db.Column(db.String(300), nullable=False)
     tipo = db.Column(db.String(10), nullable=False)
     data_upload = db.Column(db.DateTime, default=datetime.utcnow)
+
+# ---------------------------
+# NOVO MODELO: CONFIGURAÇÃO FINANCEIRA (CUSTOS FIXOS)
+# ---------------------------
+class ConfiguracaoFinanceira(db.Model):
+    __tablename__ = 'configuracao_financeira'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Custos Fixos (Mensais)
+    aluguel_iptu = db.Column(db.Float, default=100.0)
+    pro_labore = db.Column(db.Float, default=6000.0)
+    agua_energia_base = db.Column(db.Float, default=0.0)
+    internet_telefone = db.Column(db.Float, default=0.0)
+    mei_impostos = db.Column(db.Float, default=0.0)
+    marketing = db.Column(db.Float, default=0.0)
+    seguro = db.Column(db.Float, default=0.0)
+    
+    # Taxas e Regras (Porcentagens e Valores)
+    taxa_debito = db.Column(db.Float, default=1.09)
+    taxa_credito_vista = db.Column(db.Float, default=2.99)
+    taxa_credito_parcelado = db.Column(db.Float, default=7.99)
+    minimo_parcelamento = db.Column(db.Float, default=300.0)
+    
+    # Operação
+    capacidade_mensal = db.Column(db.Integer, default=40)
