@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 from sqlalchemy import text
 from urllib.parse import unquote
-from database import db, Cliente, Moto, Agendamento, Produto, MidiaAgendamento, Servico
+from database import db, Cliente, Moto, Agendamento, Produto, MidiaAgendamento, Servico, ConfiguracaoFinanceira
 
 app = Flask(__name__)
 
@@ -54,9 +54,34 @@ def verificar_migracoes_banco():
                     print("--- Migração: Coluna 'link_compra' adicionada em Produtos. ---")
                 except Exception:
                     conn.rollback()
+
+                # 3. Migrações de AGENDAMENTOS (Campos Financeiros)
+                colunas_agendamentos = [
+                    ("forma_pagamento_prevista", "VARCHAR(50)"),
+                    ("forma_pagamento_real", "VARCHAR(50)"),
+                    ("parcelas", "INTEGER DEFAULT 1"),
+                    ("taxa_aplicada", "FLOAT DEFAULT 0.0"),
+                    ("valor_liquido", "FLOAT")
+                ]
+                for col, tipo in colunas_agendamentos:
+                    try:
+                        conn.execute(text(f"ALTER TABLE agendamentos ADD COLUMN {col} {tipo}"))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
                         
         except Exception as e:
             print(f"Erro ao verificar migrações: {e}")
+
+def inicializar_configuracoes_financeiras():
+    try:
+        if ConfiguracaoFinanceira.query.first() is None:
+            nova_config = ConfiguracaoFinanceira()
+            db.session.add(nova_config)
+            db.session.commit()
+            print("--- Configurações Financeiras Iniciais Criadas ---")
+    except Exception as e:
+        print(f"Erro ao inicializar configurações financeiras: {e}")
 
 def inicializar_servicos_padrao():
     try:
@@ -145,6 +170,7 @@ def inicializar_produtos_padrao():
 with app.app_context():
     db.create_all()
     verificar_migracoes_banco()
+    inicializar_configuracoes_financeiras()
     inicializar_servicos_padrao()
     inicializar_produtos_padrao() 
 
@@ -169,6 +195,7 @@ def dashboard():
     agendamentos = Agendamento.query.filter(Agendamento.data_agendada >= hoje_completo).order_by(Agendamento.data_agendada).all()
     produtos_alerta = Produto.query.filter(Produto.estoque_atual <= Produto.ponto_pedido).all()
     clientes_todos = Cliente.query.all()
+    config = ConfiguracaoFinanceira.query.first()
     
     servicos_db = Servico.query.all()
     tabela_precos = {}
@@ -182,27 +209,70 @@ def dashboard():
                            alertas=produtos_alerta, 
                            clientes_todos=clientes_todos, 
                            hoje=hoje_data,
-                           tabela_precos=tabela_precos)
+                           tabela_precos=tabela_precos,
+                           config=config)
 
 # --- FINANCEIRO ---
 @app.route('/financeiro')
 def financeiro():
-    concluidos = Agendamento.query.filter_by(status='Lavagem Concluída').all()
+    config = ConfiguracaoFinanceira.query.first()
+    if not config:
+        config = ConfiguracaoFinanceira()
+        db.session.add(config)
+        db.session.commit()
+        
+    concluidos = Agendamento.query.filter(Agendamento.status.in_(['Lavagem Concluída', 'Retirado'])).all()
     
-    faturamento_total = sum(a.valor_cobrado for a in concluidos)
+    faturamento_bruto = sum(a.valor_cobrado for a in concluidos)
+    # Faturamento líquido considera a taxa deduzida nos itens Retirados; os apenas Concluídos assumem 100% até a retirada
+    faturamento_liquido = sum(a.valor_liquido if a.valor_liquido else a.valor_cobrado for a in concluidos)
+    
     custo_produtos_total = sum(a.custo_total_produtos for a in concluidos)
-    lucro_estimado = faturamento_total - custo_produtos_total
-    ticket_medio = faturamento_total / len(concluidos) if concluidos else 0
+    custos_fixos_total = config.aluguel_iptu + config.pro_labore + config.agua_energia_base + config.internet_telefone + config.mei_impostos + config.marketing + config.seguro
+    
+    lucro_estimado = faturamento_liquido - custo_produtos_total - custos_fixos_total
+    ticket_medio = faturamento_bruto / len(concluidos) if concluidos else 0
     
     servicos = Servico.query.order_by(Servico.categoria, Servico.valor).all()
     
     return render_template('financeiro.html', 
-                           faturamento=faturamento_total, 
-                           custos=custo_produtos_total, 
+                           faturamento_bruto=faturamento_bruto,
+                           faturamento_liquido=faturamento_liquido,
+                           custos_produtos=custo_produtos_total, 
+                           custos_fixos=custos_fixos_total,
                            lucro=lucro_estimado,
                            ticket_medio=ticket_medio,
                            qtd_servicos=len(concluidos),
-                           servicos=servicos)
+                           servicos=servicos,
+                           config=config)
+
+@app.route('/salvar_configuracao_financeira', methods=['POST'])
+def salvar_configuracao_financeira():
+    try:
+        config = ConfiguracaoFinanceira.query.first()
+        if not config:
+            config = ConfiguracaoFinanceira()
+            db.session.add(config)
+        
+        config.aluguel_iptu = float(request.form.get('aluguel_iptu', 0))
+        config.pro_labore = float(request.form.get('pro_labore', 0))
+        config.agua_energia_base = float(request.form.get('agua_energia_base', 0))
+        config.internet_telefone = float(request.form.get('internet_telefone', 0))
+        config.mei_impostos = float(request.form.get('mei_impostos', 0))
+        config.marketing = float(request.form.get('marketing', 0))
+        config.seguro = float(request.form.get('seguro', 0))
+        
+        config.taxa_debito = float(request.form.get('taxa_debito', 0))
+        config.taxa_credito_vista = float(request.form.get('taxa_credito_vista', 0))
+        config.taxa_credito_parcelado = float(request.form.get('taxa_credito_parcelado', 0))
+        config.minimo_parcelamento = float(request.form.get('minimo_parcelamento', 0))
+        config.capacidade_mensal = int(request.form.get('capacidade_mensal', 40))
+        
+        db.session.commit()
+        flash('Configurações financeiras atualizadas com sucesso!', 'success')
+    except Exception as e:
+        flash(f'Erro ao salvar configurações: {e}', 'error')
+    return redirect(url_for('financeiro'))
 
 @app.route('/atualizar_preco', methods=['POST'])
 def atualizar_preco():
@@ -229,6 +299,9 @@ def novo_agendamento():
         tipo_servico = request.form.get('tipo_servico')
         valor = float(request.form.get('valor'))
         
+        forma_pagamento_prevista = request.form.get('forma_pagamento_prevista')
+        parcelas = int(request.form.get('parcelas', 1))
+        
         data_agendada = datetime.strptime(f"{data_str} {hora_str}", '%Y-%m-%d %H:%M')
         
         cliente = Cliente.query.get(cliente_id)
@@ -240,8 +313,14 @@ def novo_agendamento():
             cliente.qtd_descontos -= 1 
         
         novo_agendamento = Agendamento(
-            cliente_id=cliente_id, moto_id=moto_id, data_agendada=data_agendada,
-            tipo_servico=tipo_servico, valor_cobrado=valor, desconto_aplicado=aplicar_desconto
+            cliente_id=cliente_id, 
+            moto_id=moto_id, 
+            data_agendada=data_agendada,
+            tipo_servico=tipo_servico, 
+            valor_cobrado=valor, 
+            desconto_aplicado=aplicar_desconto,
+            forma_pagamento_prevista=forma_pagamento_prevista,
+            parcelas=parcelas
         )
         db.session.add(novo_agendamento)
         db.session.commit()
@@ -284,7 +363,7 @@ def excluir_agendamento(id):
     try:
         a = Agendamento.query.get(id)
         if a:
-            if a.status != 'Cancelado' and a.status != 'Lavagem Concluída' and a.desconto_aplicado:
+            if a.status != 'Cancelado' and a.status != 'Lavagem Concluída' and a.status != 'Retirado' and a.desconto_aplicado:
                 a.cliente.qtd_descontos += 1
 
             for midia in a.midias:
@@ -469,12 +548,39 @@ def atualizar_status(id, status):
             a.custo_total_produtos = custo
         
         if a.cliente.indicado_por_id:
-            lavagens_concluidas = Agendamento.query.filter_by(cliente_id=a.cliente.id, status='Lavagem Concluída').count()
+            lavagens_concluidas = Agendamento.query.filter(Agendamento.cliente_id == a.cliente.id, Agendamento.status.in_(['Lavagem Concluída', 'Retirado'])).count()
             if lavagens_concluidas == 1:
                 padrinho = Cliente.query.get(a.cliente.indicado_por_id)
                 if padrinho:
                     padrinho.qtd_descontos += 1
-    
+                    
+    elif status == 'Retirado':
+        a.status = 'Retirado'
+        
+        forma_pgto = request.form.get('forma_pagamento_real')
+        parcelas = request.form.get('parcelas_reais')
+        
+        if forma_pgto:
+            a.forma_pagamento_real = forma_pgto
+            a.parcelas = int(parcelas) if parcelas else 1
+            
+            config = ConfiguracaoFinanceira.query.first()
+            taxa = 0.0
+            
+            if forma_pgto == 'Debito':
+                taxa = config.taxa_debito
+            elif forma_pgto == 'Credito A Vista':
+                taxa = config.taxa_credito_vista
+            elif forma_pgto == 'Credito Parcelado':
+                taxa = config.taxa_credito_parcelado
+                
+            a.taxa_aplicada = taxa
+            a.valor_liquido = a.valor_cobrado - (a.valor_cobrado * (taxa / 100.0))
+        else:
+            # Caso os dados não venham, assume o previsto sem descontar taxa adicional
+            a.forma_pagamento_real = a.forma_pagamento_prevista
+            a.valor_liquido = a.valor_cobrado
+
     db.session.commit()
     flash(f'Status atualizado para {status} às {horario_dt.strftime("%H:%M")}', 'info')
     return redirect(url_for('dashboard'))
@@ -556,7 +662,7 @@ def listar_clientes():
     
     for c in clientes_brutos:
         agendamentos_recentes = sorted(c.agendamentos, key=lambda x: x.data_agendada, reverse=True)
-        lavagens_concluidas = [a for a in c.agendamentos if a.status == 'Lavagem Concluída']
+        lavagens_concluidas = [a for a in c.agendamentos if a.status in ('Lavagem Concluída', 'Retirado')]
         lavagens_canceladas = [a for a in c.agendamentos if a.status == 'Cancelado']
         
         clientes_processados.append({
@@ -574,4 +680,3 @@ def listar_clientes():
 
 if __name__ == '__main__': 
     app.run(debug=True, host='0.0.0.0')
-
