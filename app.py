@@ -351,14 +351,13 @@ def financeiro():
         meta_motos = math.ceil(custos_fixos_total / 70.0) if custos_fixos_total > 0 else 0
         
     total_motos_ciclo = len(concluidos)
-    custo_fixo_por_moto = custos_fixos_total / total_motos_ciclo if total_motos_ciclo > 0 else 0
     
     dre_lista = []
     for a in concluidos:
         recebido = a.valor_liquido if a.valor_liquido else a.valor_cobrado
         produtos = a.custo_total_produtos
         desp_variaveis = a.gastos_extras
-        lucro_real_moto = recebido - produtos - desp_variaveis - custo_fixo_por_moto
+        margem_contribuicao_moto = recebido - produtos - desp_variaveis
         
         dre_lista.append({
             'cliente': a.cliente.nome,
@@ -368,9 +367,8 @@ def financeiro():
             'forma_pagamento': a.forma_pagamento_real if a.forma_pagamento_real else (a.forma_pagamento_prevista if a.forma_pagamento_prevista else 'PIX'),
             'valor_recebido': recebido,
             'gasto_produtos': produtos,
-            'despesas_fixas_rateadas': custo_fixo_por_moto,
             'despesas_variaveis': desp_variaveis,
-            'lucro_estimado': lucro_real_moto
+            'margem_contribuicao': margem_contribuicao_moto
         })
         
     dre_lista.sort(key=lambda x: x['data'])
@@ -393,6 +391,7 @@ def financeiro():
                            custos_produtos=custo_produtos_total, 
                            custos_fixos=custos_fixos_total,
                            lucro=lucro_estimado,
+                           margem_contribuicao_total=margem_contribuicao_total,
                            ticket_medio=ticket_medio,
                            qtd_servicos=total_motos_ciclo,
                            servicos=servicos,
