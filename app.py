@@ -205,88 +205,115 @@ def inicializar_configuracoes_financeiras():
     except Exception as e:
         print(f"Erro ao inicializar configurações financeiras: {e}")
 
-def inicializar_servicos_padrao():
-    try:
-        if Servico.query.first() is None:
-            padroes = [
-                ('Naked', 'Standard Naked', 50.00, 'Lavagem detalhada básica'), 
-                ('Naked', 'Premium Naked', 90.00, 'Lavagem com enceramento e proteção'),
-                ('Sport', 'Standard Sport', 70.00, 'Lavagem detalhada básica'), 
-                ('Sport', 'Premium Sport', 120.00, 'Lavagem com enceramento e proteção'),
-                ('Custom', 'Standard Custom', 80.00, 'Lavagem detalhada básica com polimento de cromados leves'), 
-                ('Custom', 'Premium Custom', 150.00, 'Lavagem completa com proteção avançada de metais'),
-                ('BigTrail', 'Standard Trail', 60.00, 'Lavagem para remoção de terra e barro leve'), 
-                ('BigTrail', 'Premium Trail', 110.00, 'Lavagem profunda desincrustante e proteção plástica')
-            ]
-            for cat, nome, valor, desc in padroes:
-                db.session.add(Servico(categoria=cat, nome=nome, valor=valor, descricao=desc))
-            db.session.commit()
-    except Exception as e:
-        print(f"Erro ao inicializar serviços: {e}")
-
 def inicializar_produtos_padrao():
     try:
         produtos_iniciais = [
-            ("Moto-V (Shampoo p/ graxa e barro)", "ml", 10.0),
-            ("Rexer (Desengraxante chassis/suspen.)", "ml", 30.0),
-            ("V-Mol (Shampoo desincrustante (terra))", "ml", 10.0),
-            ("V-Floc (Shampoo neutro (manutenção))", "ml", 5.0),
-            ("Vexus (Limpador de rodas e motores)", "ml", 25.0),
-            ("Sintra Fast (APC (manoplas e detalhes))", "ml", 15.0),
-            ("Izer (Descontaminante ferroso)", "ml", 30.0),
-            ("Strike (Removedor de piche e cola)", "ml", 5.0),
-            ("Delet (Limpador de pneus/borrachas)", "ml", 20.0),
-            ("V-Bar (Clay Bar (remoção aspereza))", "g", 2.0),
-            ("V-Lub (Lubrificante p/ V-Bar)", "ml", 40.0),
-            ("Revelax (Revelador de hologramas)", "ml", 20.0),
-            ("V-Polish (Composto de refino e lustro)", "ml", 10.0),
-            ("Blend Spray (Proteção híbrida)", "ml", 10.0),
-            ("Native Paste (Cera de Carnaúba Pura)", "g", 3.0),
-            ("Tok Final (Cera rápida pós-lavagem)", "ml", 15.0),
-            ("V-80 (Selante sintético)", "ml", 10.0),
-            ("SIO2-PRO (Selante p/ pinturas foscas)", "ml", 10.0),
-            ("Verniz Motor (Proteção e brilho (motor))", "ml", 40.0),
-            ("Verom (Condicionador de motor (água))", "ml", 30.0),
-            ("Restaurax (Renovador de plásticos)", "ml", 10.0),
-            ("Revox (Selante de pneus (fosco))", "ml", 5.0),
-            ("Shiny (Brilho intenso para pneus)", "ml", 5.0),
-            ("Glazy (Limpa vidros e retrovisores)", "ml", 10.0),
-            ("Prizm (Removedor de chuva ácida)", "ml", 5.0),
-            ("Aquaglass (Repelente de água (viseiras))", "ml", 3.0),
-            ("V-Paint (Vitrificador cerâmico)", "ml", 10.0),
-            ("V-Plastic (Vitrificador p/ plásticos)", "ml", 10.0),
-            ("V-Energy (Vitrificador de Motor)", "ml", 5.0),
-            ("V-Light (Vitrificador de faróis)", "ml", 2.0),
-            ("V-Leather (Coating p/ bancos em couro)", "ml", 5.0),
-            ("V-Wheels (Vitrificador de metais)", "ml", 10.0),
-            ("Ziva (Vitrificador para pneus)", "ml", 10.0)
+            ("Moto-V", "ml", 10.0, 64.50, 500.0),
+            ("Rexer", "ml", 30.0, 54.90, 500.0),
+            ("V-Mol", "ml", 10.0, 94.03, 500.0),
+            ("V-Floc", "ml", 5.0, 114.90, 500.0),
+            ("Vexus", "ml", 25.0, 81.90, 500.0),
+            ("Sintra Fast", "ml", 15.0, 80.70, 500.0),
+            ("Izer", "ml", 30.0, 122.90, 500.0),
+            ("Strike", "ml", 5.0, 130.00, 500.0),
+            ("Delet", "ml", 20.0, 92.30, 500.0),
+            ("V-Bar", "g", 2.0, 20.00, 50.0),
+            ("V-Lub", "ml", 40.0, 20.00, 500.0),
+            ("Revelax", "ml", 20.0, 95.90, 500.0),
+            ("V-Polish", "ml", 10.0, 115.20, 500.0),
+            ("Blend (Spray)", "ml", 10.0, 47.93, 500.0),
+            ("Native (Paste)", "g", 3.0, 54.00, 100.0),
+            ("Tok Final", "ml", 15.0, 25.30, 500.0),
+            ("V-80", "ml", 10.0, 55.80, 500.0),
+            ("SIO2-PRO", "ml", 10.0, 43.90, 500.0),
+            ("Verniz Motor", "ml", 40.0, 89.50, 500.0),
+            ("Verom", "ml", 30.0, 75.79, 500.0),
+            ("Restaurax", "ml", 10.0, 115.90, 500.0),
+            ("Revox", "ml", 5.0, 42.50, 500.0),
+            ("Shiny", "ml", 5.0, 151.00, 500.0),
+            ("Glazy", "ml", 10.0, 27.76, 500.0),
+            ("Prizm", "ml", 5.0, 33.00, 500.0),
+            ("Aquaglass", "ml", 3.0, 30.00, 50.0),
+            ("V-Paint", "ml", 10.0, 74.30, 50.0),
+            ("V-Plastic", "ml", 10.0, 63.90, 50.0),
+            ("V-Energy", "ml", 5.0, 125.50, 50.0),
+            ("V-Light", "ml", 2.0, 61.50, 50.0),
+            ("V-Leather", "ml", 5.0, 138.90, 50.0),
+            ("V-Wheels", "ml", 10.0, 50.00, 50.0),
+            ("Ziva", "ml", 10.0, 50.00, 50.0)
         ]
         
         count_novos = 0
-        for nome, un, gasto in produtos_iniciais:
-            produto_existente = Produto.query.filter_by(nome=nome).first()
+        for core_nome, un, gasto, custo, qtd in produtos_iniciais:
+            produto_existente = Produto.query.filter(Produto.nome.ilike(f"{core_nome}%")).first()
             if not produto_existente:
                 novo = Produto(
-                    nome=nome, unidade_medida=un, estoque_atual=0.0,
-                    custo_compra=0.0, quantidade_compra=0.0, 
+                    nome=core_nome, unidade_medida=un, estoque_atual=0.0,
+                    custo_compra=custo, quantidade_compra=qtd, 
                     gasto_medio_lavagem=gasto, ponto_pedido=5.0, link_compra=""
                 )
                 db.session.add(novo)
                 count_novos += 1
+            else:
+                produto_existente.nome = core_nome
+                produto_existente.custo_compra = custo
+                produto_existente.quantidade_compra = qtd
+                produto_existente.gasto_medio_lavagem = gasto
         
+        db.session.commit()
         if count_novos > 0:
-            db.session.commit()
-            print(f"--- {count_novos} Produtos Iniciais Cadastrados (Zerados) ---")
+            print(f"--- {count_novos} Produtos Iniciais Cadastrados/Atualizados ---")
             
     except Exception as e:
         print(f"Erro ao inicializar produtos: {e}")
+
+def inicializar_servicos_padrao():
+    try:
+        # Pega a base de produtos atualizada para vincular aos serviços
+        todos_produtos = Produto.query.all()
+        vitrificadores_nomes = ['V-Paint', 'V-Plastic', 'V-Energy', 'V-Light', 'V-Leather']
+        prods_standard = [p for p in todos_produtos if p.nome not in vitrificadores_nomes]
+        prods_premium = todos_produtos
+
+        if Servico.query.first() is None:
+            padroes = [
+                ('Naked', 'Standard Naked', 50.00, 'Lavagem detalhada básica'), 
+                ('Naked', 'Premium Naked', 90.00, 'Lavagem com enceramento e proteção vitrificada'),
+                ('Sport', 'Standard Sport', 70.00, 'Lavagem detalhada básica'), 
+                ('Sport', 'Premium Sport', 120.00, 'Lavagem com enceramento e proteção vitrificada'),
+                ('Custom', 'Standard Custom', 80.00, 'Lavagem detalhada básica com polimento de cromados leves'), 
+                ('Custom', 'Premium Custom', 150.00, 'Lavagem completa com proteção avançada de metais e vitrificadores'),
+                ('BigTrail', 'Standard Trail', 60.00, 'Lavagem para remoção de terra e barro leve'), 
+                ('BigTrail', 'Premium Trail', 110.00, 'Lavagem profunda desincrustante e proteção plástica premium')
+            ]
+            for cat, nome, valor, desc in padroes:
+                novo_servico = Servico(categoria=cat, nome=nome, valor=valor, descricao=desc)
+                if 'Standard' in nome:
+                    novo_servico.produtos_vinculados = prods_standard
+                else:
+                    novo_servico.produtos_vinculados = prods_premium
+                db.session.add(novo_servico)
+            db.session.commit()
+        else:
+            # Caso a tabela já exista, forçamos o vínculo para os serviços que estiverem vazios
+            servicos = Servico.query.all()
+            for s in servicos:
+                if not s.produtos_vinculados:
+                    if 'Standard' in s.nome:
+                        s.produtos_vinculados = prods_standard
+                    elif 'Premium' in s.nome:
+                        s.produtos_vinculados = prods_premium
+            db.session.commit()
+            
+    except Exception as e:
+        print(f"Erro ao inicializar serviços: {e}")
 
 with app.app_context():
     db.create_all()
     verificar_migracoes_banco()
     inicializar_configuracoes_financeiras()
-    inicializar_servicos_padrao()
     inicializar_produtos_padrao() 
+    inicializar_servicos_padrao()
 
 try:
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -902,9 +929,9 @@ def atualizar_status(id, status):
             # Dá baixa apenas nos produtos que fazem parte da receita deste serviço específico
             if servico_realizado and servico_realizado.produtos_vinculados:
                 for p in servico_realizado.produtos_vinculados:
-                    if p.estoque_atual >= p.gasto_medio_lavagem:
-                        p.estoque_atual -= p.gasto_medio_lavagem
-                        custo += p.custo_por_dose
+                    # Removemos a condicional que barrava a baixa e o custo se não houvesse estoque
+                    p.estoque_atual -= p.gasto_medio_lavagem
+                    custo += p.custo_por_dose
             a.custo_total_produtos = custo
         
         if a.cliente.indicado_por_id:
