@@ -89,6 +89,13 @@ def verificar_migracoes_banco():
                     conn.commit()
                 except Exception:
                     conn.rollback()
+
+                # 6. Migrações SERVIÇOS (Descrição)
+                try:
+                    conn.execute(text("ALTER TABLE servicos ADD COLUMN descricao TEXT"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
                         
         except Exception as e:
             print(f"Erro ao verificar migrações: {e}")
@@ -202,13 +209,17 @@ def inicializar_servicos_padrao():
     try:
         if Servico.query.first() is None:
             padroes = [
-                ('Naked', 'Standard Naked', 50.00), ('Naked', 'Premium Naked', 90.00),
-                ('Sport', 'Standard Sport', 70.00), ('Sport', 'Premium Sport', 120.00),
-                ('Custom', 'Standard Custom', 80.00), ('Custom', 'Premium Custom', 150.00),
-                ('BigTrail', 'Standard Trail', 60.00), ('BigTrail', 'Premium Trail', 110.00)
+                ('Naked', 'Standard Naked', 50.00, 'Lavagem detalhada básica'), 
+                ('Naked', 'Premium Naked', 90.00, 'Lavagem com enceramento e proteção'),
+                ('Sport', 'Standard Sport', 70.00, 'Lavagem detalhada básica'), 
+                ('Sport', 'Premium Sport', 120.00, 'Lavagem com enceramento e proteção'),
+                ('Custom', 'Standard Custom', 80.00, 'Lavagem detalhada básica com polimento de cromados leves'), 
+                ('Custom', 'Premium Custom', 150.00, 'Lavagem completa com proteção avançada de metais'),
+                ('BigTrail', 'Standard Trail', 60.00, 'Lavagem para remoção de terra e barro leve'), 
+                ('BigTrail', 'Premium Trail', 110.00, 'Lavagem profunda desincrustante e proteção plástica')
             ]
-            for cat, nome, valor in padroes:
-                db.session.add(Servico(categoria=cat, nome=nome, valor=valor))
+            for cat, nome, valor, desc in padroes:
+                db.session.add(Servico(categoria=cat, nome=nome, valor=valor, descricao=desc))
             db.session.commit()
     except Exception as e:
         print(f"Erro ao inicializar serviços: {e}")
@@ -246,7 +257,9 @@ def inicializar_produtos_padrao():
             ("V-Plastic (Vitrificador p/ plásticos)", "ml", 10.0),
             ("V-Energy (Vitrificador de Motor)", "ml", 5.0),
             ("V-Light (Vitrificador de faróis)", "ml", 2.0),
-            ("V-Leather (Coating p/ bancos em couro)", "ml", 5.0)
+            ("V-Leather (Coating p/ bancos em couro)", "ml", 5.0),
+            ("V-Wheels (Vitrificador de metais)", "ml", 10.0),
+            ("Ziva (Vitrificador para pneus)", "ml", 10.0)
         ]
         
         count_novos = 0
@@ -370,16 +383,33 @@ def financeiro():
     
     margem_contribuicao_total = faturamento_liquido - total_custos_variaveis
     margem_media = margem_contribuicao_total / len(concluidos) if concluidos else 0
-    
     lucro_estimado = margem_contribuicao_total - custos_fixos_total
     ticket_medio = faturamento_bruto / len(concluidos) if concluidos else 0
-    
-    if margem_media > 0:
-        meta_motos = math.ceil(custos_fixos_total / margem_media)
-    else:
-        meta_motos = math.ceil(custos_fixos_total / 70.0) if custos_fixos_total > 0 else 0
-        
     total_motos_ciclo = len(concluidos)
+
+    # --- LÓGICA INTELIGENTE DE META DE MOTOS ---
+    menor_servico = Servico.query.order_by(Servico.valor.asc()).first()
+    pior_margem = 50.0 # Fallback de segurança
+    
+    if menor_servico and menor_servico.valor > 0:
+        # Pior cenário exigido: Pagamento em Crédito Parcelado
+        taxa_pior = config.taxa_credito_parcelado
+        receita_liquida_pior = menor_servico.valor - (menor_servico.valor * (taxa_pior / 100.0))
+        custo_prod_pior = sum(p.custo_por_dose for p in menor_servico.produtos_vinculados) if menor_servico.produtos_vinculados else 0.0
+        pior_margem_calc = receita_liquida_pior - custo_prod_pior
+        
+        if pior_margem_calc > 0:
+            pior_margem = pior_margem_calc
+
+    custos_fixos_restantes = custos_fixos_total - margem_contribuicao_total
+    motos_restantes_meta = 0
+
+    if custos_fixos_restantes > 0:
+        motos_restantes_meta = math.ceil(custos_fixos_restantes / pior_margem)
+        meta_motos = total_motos_ciclo + motos_restantes_meta
+    else:
+        meta_motos = total_motos_ciclo # Meta já foi atingida ou ultrapassada
+
     
     # 2. DRE Lista
     dre_lista = []
@@ -403,7 +433,7 @@ def financeiro():
         
     dre_lista.sort(key=lambda x: x['data'])
     
-    # 3. GESTÃO PATRIMONIAL E SUSTENTAÇÃO (NOVO)
+    # 3. GESTÃO PATRIMONIAL E SUSTENTAÇÃO
     total_aporte = config.aporte_erick + config.aporte_andrei
     total_capex = config.capex_produtos + config.capex_ferramentas + config.capex_estrutura + config.capex_marketing + config.capex_outros
     
@@ -450,19 +480,81 @@ def financeiro():
                            produtos_todos=produtos_todos,
                            config=config,
                            meta_motos=meta_motos,
+                           motos_restantes_meta=motos_restantes_meta,
                            dre_lista=dre_lista,
                            mes_referencia=mes_referencia,
                            data_inicio=data_inicio,
                            data_fim=data_fim,
                            deficit_anterior=deficit_anterior,
                            meses_disponiveis=meses_disponiveis,
-                           # Novas Variaveis Patrimoniais
+                           # Variaveis Patrimoniais
                            total_aporte=total_aporte,
                            total_capex=total_capex,
                            lucro_acumulado=lucro_acumulado,
                            caixa_atual=caixa_atual,
                            payback_percentual=payback_percentual,
                            is_sustentavel=is_sustentavel)
+
+# --- ROTAS DE SERVIÇOS (TABELA DE PREÇOS) ---
+@app.route('/adicionar_servico', methods=['POST'])
+def adicionar_servico():
+    try:
+        novo = Servico(
+            categoria=request.form.get('categoria'),
+            nome=request.form.get('nome'),
+            valor=float(request.form.get('valor')),
+            descricao=request.form.get('descricao')
+        )
+        db.session.add(novo)
+        db.session.commit()
+        flash('Novo serviço cadastrado com sucesso!', 'success')
+    except Exception as e:
+        flash(f'Erro ao cadastrar serviço: {e}', 'error')
+    return redirect(url_for('financeiro'))
+
+@app.route('/editar_servico', methods=['POST'])
+def editar_servico():
+    try:
+        s_id = request.form.get('servico_id')
+        s = Servico.query.get(s_id)
+        if s:
+            s.categoria = request.form.get('categoria')
+            s.nome = request.form.get('nome')
+            s.valor = float(request.form.get('valor'))
+            s.descricao = request.form.get('descricao')
+            db.session.commit()
+            flash('Serviço atualizado com sucesso!', 'success')
+    except Exception as e:
+        flash(f'Erro ao atualizar serviço: {e}', 'error')
+    return redirect(url_for('financeiro'))
+
+@app.route('/excluir_servico/<int:id>')
+def excluir_servico(id):
+    try:
+        s = Servico.query.get(id)
+        if s:
+            s.produtos_vinculados = []
+            db.session.delete(s)
+            db.session.commit()
+            flash('Serviço excluído com sucesso!', 'success')
+    except Exception as e:
+        flash(f'Erro ao excluir serviço: {e}', 'error')
+    return redirect(url_for('financeiro'))
+
+@app.route('/atualizar_preco', methods=['POST'])
+def atualizar_preco():
+    # Rota mantida por segurança/compatibilidade, mas a edição completa é recomendada
+    try:
+        servico_id = request.form.get('id')
+        novo_valor = request.form.get('valor')
+        servico = Servico.query.get(servico_id)
+        if servico:
+            servico.valor = float(novo_valor)
+            db.session.commit()
+            flash('Preço rápido atualizado!', 'success')
+    except Exception as e:
+        flash(f'Erro: {e}', 'error')
+    return redirect(url_for('financeiro'))
 
 @app.route('/vincular_produtos_servico', methods=['POST'])
 def vincular_produtos_servico():
@@ -551,19 +643,6 @@ def restart_financeiro():
         flash(f'Erro ao resetar histórico: {e}', 'error')
     return redirect(url_for('financeiro'))
 
-@app.route('/atualizar_preco', methods=['POST'])
-def atualizar_preco():
-    try:
-        servico_id = request.form.get('id')
-        novo_valor = request.form.get('valor')
-        servico = Servico.query.get(servico_id)
-        if servico:
-            servico.valor = float(novo_valor)
-            db.session.commit()
-            flash('Preço atualizado!', 'success')
-    except Exception as e:
-        flash(f'Erro: {e}', 'error')
-    return redirect(url_for('financeiro'))
 
 # --- AGENDAMENTO ---
 @app.route('/novo_agendamento', methods=['POST'])
