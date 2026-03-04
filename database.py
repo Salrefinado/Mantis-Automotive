@@ -105,6 +105,7 @@ class Servico(db.Model):
     categoria = db.Column(db.String(50), nullable=False) # Ex: Naked, Sport
     nome = db.Column(db.String(100), nullable=False)     # Ex: Standard Naked
     valor = db.Column(db.Float, nullable=False)          # Ex: 50.00
+    descricao = db.Column(db.Text, nullable=True)        # Ex: Detalhamento do que é feito na lavagem
     
     # Relacionamento com os Produtos (Receita do Serviço)
     produtos_vinculados = db.relationship('Produto', secondary=servico_produto_assoc, lazy='subquery',
