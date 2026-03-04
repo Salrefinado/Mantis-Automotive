@@ -175,7 +175,9 @@
                     <tr class="hover:bg-slate-100 transition">
                         <td class="p-4 font-bold opacity-75">{{ prod.nome }}</td>
                         
-                        <td class="p-4 text-center font-mono opacity-60">R$ 0,00</td>
+                        <td class="p-4 text-center font-mono opacity-60">
+                            R$ {{ "%.2f"|format(prod.custo_compra) }}
+                        </td>
                         
                         <td class="p-4 text-center font-bold text-red-400 bg-red-50 rounded">0 {{ prod.unidade_medida }}</td>
 
